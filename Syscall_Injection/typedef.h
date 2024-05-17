@@ -1,46 +1,6 @@
 #include <Windows.h>
 #include <stdio.h>
 
-typedef NTSTATUS(*NtResumeProcessPtr)(
-    IN HANDLE ProcessHandle
-    );
-typedef NTSTATUS(*NtWriteVirtualMemoryPtr)(
-	HANDLE ProcessHandle,
-	PVOID BaseAddress,
-	PVOID Buffer,
-	IN ULONG NumberOfBytesToWrite,
-	OUT PULONG NumberOfBytesWritten
-	);
-
-typedef LPVOID(*NtAllocateVirtualMemoryPtr)(
-	HANDLE hProcess,
-	LPVOID lpAddress,
-	SIZE_T dwSize,
-	DWORD  flAllocationType,
-	DWORD  flProtect
-	);
-
-typedef NTSTATUS(*NtProtectVirtualMemoryPtr)(
-	HANDLE ProcessHandle,
-	PVOID* BaseAddress,
-	PSIZE_T NumberOfBytesToProtect,
-	ULONG NewAccessProtection,
-	PULONG OldAccessProtection
-	);
-
-typedef NTSTATUS(*NtCreateThreadExPtr)(
-	PHANDLE ThreadHandle,
-	ACCESS_MASK DesiredAccess,
-	PVOID ObjectAttributes,
-	HANDLE ProcessHandle,
-	PVOID StartRoutine,
-	PVOID Argument,
-	ULONG CreateFlags,
-	ULONG_PTR ZeroBits,
-	SIZE_T StackSize,
-	SIZE_T MaximumStackSize,
-	PVOID AttributeList
-	);
 
 typedef struct _UNICODE_STRING {
     USHORT Length;        // Length of the string in bytes
@@ -222,11 +182,3 @@ typedef NTSTATUS(NTAPI* NtQueryProcessInformationPtr)(
 	ULONG            ProcessInformationLength,
 	PULONG           
 	);
-
-typedef NTSTATUS(NTAPI* NtReadVirtualMemoryPtr)(
-    HANDLE ProcessHandle,
-    PVOID  BaseAddress,
-    PVOID  Buffer,
-    SIZE_T NumberOfBytesToRead,
-    PSIZE_T NumberOfBytesRead
-    );
