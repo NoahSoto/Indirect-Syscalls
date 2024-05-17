@@ -13,7 +13,7 @@ typedef _Return_type_success_(return >= 0) LONG NTSTATUS;
 typedef NTSTATUS* PNTSTATUS;
 #endif
 
-#define SW3_SEED 0x91E946AB
+#define SW3_SEED 0x26F87F0E
 #define SW3_ROL8(v) (v << 8 | v >> 24)
 #define SW3_ROR8(v) (v >> 8 | v << 24)
 #define SW3_ROX8(v) ((SW3_SEED % 2) ? SW3_ROL8(v) : SW3_ROR8(v))
@@ -61,6 +61,10 @@ BOOL SW3_PopulateSyscallList();
 EXTERN_C DWORD SW3_GetSyscallNumber(DWORD FunctionHash);
 EXTERN_C PVOID SW3_GetSyscallAddress(DWORD FunctionHash);
 EXTERN_C PVOID internal_cleancall_wow64_gate(VOID);
+EXTERN_C NTSTATUS Sw3NtResumeThread(
+	IN HANDLE ThreadHandle,
+	IN OUT PULONG PreviousSuspendCount OPTIONAL);
+
 EXTERN_C NTSTATUS Sw3NtWriteVirtualMemory(
 	IN HANDLE ProcessHandle,
 	IN PVOID BaseAddress,

