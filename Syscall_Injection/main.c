@@ -223,6 +223,7 @@ void detectDebug() {
         sizeof(DWORD64),
         NULL
     );
+
     if (isDebuggerPreset != NULL) {
         // detected a debugger
         printf("PROCESS IS BEING WATCHED!!!!!!!!!!!!!!!!!");
