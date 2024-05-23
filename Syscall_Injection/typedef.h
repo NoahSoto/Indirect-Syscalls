@@ -182,3 +182,38 @@ typedef NTSTATUS(NTAPI* NtQueryProcessInformationPtr)(
 	ULONG            ProcessInformationLength,
 	PULONG           
 	);
+
+
+
+
+//Hells Gate Adds
+
+
+typedef struct _LDR_DATA_TABLE_ENTRY {
+    LIST_ENTRY InLoadOrderLinks;
+    LIST_ENTRY InMemoryOrderLinks;
+    LIST_ENTRY InInitializationOrderLinks;
+    PVOID DllBase;
+    PVOID EntryPoint;
+    ULONG SizeOfImage;
+    UNICODE_STRING FullDllName;
+    UNICODE_STRING BaseDllName;
+    // ... additional fields omitted for brevity
+} LDR_DATA_TABLE_ENTRY, * PLDR_DATA_TABLE_ENTRY;
+
+
+
+typedef struct _CLIENT_ID {
+    HANDLE UniqueProcess;
+    HANDLE UniqueThread;
+} CLIENT_ID, * PCLIENT_ID;
+
+typedef struct _TEB {
+    NT_TIB NtTib;
+    PVOID EnvironmentPointer;
+    CLIENT_ID ClientId;
+    PVOID ActiveRpcHandle;
+    PVOID ThreadLocalStoragePointer;
+    PPEB ProcessEnvironmentBlock; // Pointer to the PEB
+    // ... additional fields omitted for brevity
+} TEB, * PTEB;
