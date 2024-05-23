@@ -406,7 +406,6 @@ int main() {
     
     PPEB pCurrentPEB = pCurrentTeb->ProcessEnvironmentBlock;
 
-
     //Now with the PEB address we can find the base of NTDLL to assist in finding fuynciton syscall instructions
     //To do this we must navigate through the PEB_LDR_DATA struct which contains all the loaded modules in the process.
 
