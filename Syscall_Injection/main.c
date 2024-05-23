@@ -282,6 +282,7 @@ BOOL DeleteSelf() {
     ZeroMemory(szPath, sizeof(szPath));
     ZeroMemory(&Delete, sizeof(FILE_DISPOSITION_INFO));
 
+
     //----------------------------------------------------------------------------------------
     // Marking the file for deletion (used in the 2nd SetFileInformationByHandle call) 
     Delete.DeleteFile = TRUE;
