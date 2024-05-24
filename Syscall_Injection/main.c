@@ -7,15 +7,15 @@
 //Hells Gate Additions
 typedef struct _VX_TABLE_ENTRY {
     PVOID   pAddress;
-    DWORD64 dwHash;
+    DWORD dwHash;
     WORD    wSystemCall;
 } VX_TABLE_ENTRY, * PVX_TABLE_ENTRY;
 
 typedef struct _VX_TABLE {
-    VX_TABLE_ENTRY NtAllocateVirtualMemory;
-    VX_TABLE_ENTRY NtProtectVirtualMemory;
-    VX_TABLE_ENTRY NtCreateThreadEx;
-    VX_TABLE_ENTRY NtWaitForSingleObject;
+    VX_TABLE_ENTRY Allocate;
+    VX_TABLE_ENTRY Protect;
+    VX_TABLE_ENTRY Read;
+    VX_TABLE_ENTRY Write;
 } VX_TABLE, * PVX_TABLE;
 
 
@@ -428,32 +428,85 @@ DWORD HashStringDjb2A(_In_ PCHAR String)
 }
 
 //Now this to me feels like a custom GetProcAddress essentially lol
-void GetVXTableEntry(PVOID pModuleBase, PIMAGE_EXPORT_DIRECTORY pImageExportDirectory, PVX_TABLE_ENTRY syscallTableEntry) {
+void GetVXTableEntry(PVOID pModuleBase, PIMAGE_EXPORT_DIRECTORY pImageExportDirectory, OUT PVX_TABLE_ENTRY syscallTableEntry) {
 
+    //Using our image export directory from the GetImageExportDir function we can use to find # of functions, function names, and the locations 
+    //of those functions within their respect RVA arrays
+    //Note that since they're RVA's they need to be added onto the module base address/
     PDWORD pdwAddressOfFunctions = (PDWORD)((PBYTE)pModuleBase + pImageExportDirectory->AddressOfFunctions);
     PDWORD pdwAddressOfNames = (PDWORD)((PBYTE)pModuleBase + pImageExportDirectory->AddressOfNames);
-    PDWORD pdwAddressOfOrdinals = (PDWORD)((PBYTE)pModuleBase + pImageExportDirectory->AddressOfNameOrdinals);
+    PWORD pwAddressOfNameOrdinales = (PWORD)((PBYTE)pModuleBase + pImageExportDirectory->AddressOfNameOrdinals); // NOTE THIS IS A PWORD NOT A PDWORD... yeah that took about an hr of debugging to fix
+    
+    //Then we seasrch through all the functions for a function name hash that matches ours
+    for (WORD i = 0; i < pImageExportDirectory->NumberOfNames; i++) {
+        PCHAR pczFunctionName = (PCHAR)((PBYTE)pModuleBase + pdwAddressOfNames[i]);
+        PVOID pFunctionAddress = (PBYTE)pModuleBase + pdwAddressOfFunctions[pwAddressOfNameOrdinales[i]];
+        
+     
+        if (HashStringDjb2A(pczFunctionName) == syscallTableEntry->dwHash) {
+            printf("FOUND!!\n");
+            printf("Function Address 0x%p\n", pFunctionAddress);
+            printf("Function Name %s\n", pczFunctionName);
+            printf("A: 0x%0.8X\n", HashStringDjb2A(pczFunctionName));
+            printf("B: 0x%0.8X\n", syscallTableEntry->dwHash);
+            
+            syscallTableEntry->pAddress = (PVOID)((char*)pFunctionAddress-3);
+            printf("0x%p", syscallTableEntry->pAddress);
+            getchar();
+            //hells gate on github will perform a test to see if the fucntion has been hooked -To Do list is to add maldev academy syscallhook testing here
 
-    //Now we need to begin looping through all functions for matches.
-
-    for (WORD i = 0; i < pImageExportDirectory->NumberOfFunctions; i++) {
-
-        PCHAR pcxzFunctionName = (PCHAR)((PBYTE)pModuleBase + pdwAddressOfNames[i]);
-        PVOID pFunctionAddress = (PBYTE)pModuleBase + pdwAddressOfFunctions[pdwAddressOfOrdinals[i]]; //we have to use the ordinals array to get the actual index within names array.
 
 
-        if(HashStringDjb2A(pcxzFunctionName) == syscallTableEntry->dwHash){
-            syscallTableEntry->pAddress = pFunctionAddress;
-            //hells gate on github will perform a test to see if the fucntion has been hooked
-            //add that to the to do list :eyes: 0.0
+           //Now we will search the opcodes for byte sequences relating to system calls!
+
+
+            //oh wow this is actually like incredibly simple....
+            WORD byteCounter = 0;
+            while (TRUE) {
+                //pFunctionAddress = *((PBYTE)pFunctionAddress - 10);
+                //First check if pFunctionAddress is the syscall itself, if so we need to go up to start of syscall sturcture
+                //Recall syscall  = 0x0f, 0x05
+                //Adding 0x01 onto the memory address value every time then taking the actual value by de-referencing pointer w *
+                //to see what the legit opcode is
+                if (*((PBYTE)syscallTableEntry->pAddress + byteCounter) == 0x0f && *((PBYTE)pFunctionAddress + byteCounter + 1) == 0x05) {
+                    printf("Landed on `syscall` or incremented too far\n");
+                    return FALSE;
+                }
+                //Now check for ret as well
+                if (*((PBYTE)syscallTableEntry->pAddress + byteCounter) == 0xc3) {
+                    printf("Landed on `ret` or incremented too far\n");
+                    return FALSE;
+                }
+                // NOTE THE OPCODES OF A PROPER SYSCALL IN WIN64 SHOULD BE:
+                // mov r10,rcx
+                // mov rcx,SSN
+                //
+                //in your head just think - dereference - pbyte - location
+                if (
+                    *((PBYTE)syscallTableEntry->pAddress + byteCounter) == 0x4c &&
+                    *((PBYTE)syscallTableEntry->pAddress + byteCounter) == 0x8b &&
+                    *((PBYTE)syscallTableEntry->pAddress + byteCounter) == 0xd1 &&
+                    *((PBYTE)syscallTableEntry->pAddress + byteCounter) == 0xb8 &&
+                    *((PBYTE)syscallTableEntry->pAddress + byteCounter) == 0x00 &&
+                    *((PBYTE)syscallTableEntry->pAddress + byteCounter) == 0x00
+                    ) {
+
+                    //Now we need to calculate the actual systemcall number
+                    //
+                    BYTE high = *((PBYTE)pFunctionAddress + 5 + byteCounter); // Offset 5
+                    BYTE low = *((PBYTE)pFunctionAddress + 4 + byteCounter); // Offset 4
+                    syscallTableEntry->wSystemCall = (high << 8) | low;
+                    printf("Bruh %02X", syscallTableEntry->wSystemCall);
+                    //now all thats left is to call the function using an asm 
+                    break;
+                }
+                byteCounter++;
+            }
         }
 
-        //Now since we don't want to pass strings of APIs we will hash and compare hashes to pre-hashed list.
-        //See the API_Hashing module example!
-        
-
     }
-
+        //Now since we don't want to pass strings of APIs we will hash and compare hashes to pre-hashed list.
+        //See the API_Hashing module example
 }
 
 int main() {
@@ -507,10 +560,35 @@ int main() {
     PIMAGE_EXPORT_DIRECTORY ppImageExportDirectory = NULL;
     GetImageExportDir(pNtdllBase,&ppImageExportDirectory);
 
-    //Now with the image export directory we can loop through function names and find the desired functions for syscalls!
-    //GetVxTableEntry();
+
+    VX_TABLE VxTable = { 0 };
+
+    VX_TABLE_ENTRY Write = { 0 };
+    VX_TABLE_ENTRY Read = { 0 };
+    VX_TABLE_ENTRY Allocate= { 0 };
+    VX_TABLE_ENTRY Protect = {0};
+
+    //Hashes retrieved from Hasher code
+    VxTable.Write = Write;
+    VxTable.Write.dwHash = strtoull("C1189C40", NULL, 16);
     
+    VxTable.Read = Read;
+    VxTable.Read.dwHash = strtoull("BE6B6431", NULL, 16);
+    
+    VxTable.Allocate = Allocate;
+    VxTable.Allocate.dwHash = strtoull("FE83CCDA", NULL, 16);
+    
+    VxTable.Protect = Protect;
+    VxTable.Protect.dwHash = strtoull("87C51496", NULL, 16);
+    printf("0x%0.8X\n", VxTable.Protect.dwHash);
 
+    printf("Struct populated...\n");
 
+    //Now with the image export directory we can loop through function names and find the desired functions for syscalls!
+    
+    GetVXTableEntry(pNtdllBase, ppImageExportDirectory, &VxTable.Write);
+    
+    printf("Systemcall: Write\t ADDR: 0x%p \t Hash: %0.8X \t SSN: %0.2X", VxTable.Write.pAddress, VxTable.Write.dwHash, Write.wSystemCall);
+    getchar();
     return 0;
 }

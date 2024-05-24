@@ -37,7 +37,8 @@ DWORD HashStringDjb2W(_In_ PWCHAR String)
 int main() {
 
 
-	CHAR* cTest = "NtWriteVirtualMemory";
+	//CHAR* cTest = "A_SHAFinal";
+	CHAR* cTest = "NtReadVirtualMemory";
 	WCHAR* wTest2 = L"NtAllocateVirtualMemory";
 	WCHAR* wTest3 = L"NtProtectVirtualMemory";
 	WCHAR* wTest4 = L"NtReadVirtualMemory";
