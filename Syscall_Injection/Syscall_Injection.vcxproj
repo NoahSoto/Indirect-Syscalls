@@ -136,6 +136,7 @@
     <ClInclude Include="typedef.h" />
   </ItemGroup>
   <ItemGroup>
+    <MASM Include="noah.asm" />
     <MASM Include="Syswhispers3-asmx64.asm">
       <FileType>Document</FileType>
     </MASM>

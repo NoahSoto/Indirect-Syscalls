@@ -515,6 +515,19 @@ BOOL GetVXTableEntry(PVOID pModuleBase, PIMAGE_EXPORT_DIRECTORY pImageExportDire
     return TRUE;
 }
 
+
+
+//EXTERN IndirectSyscall : PROC
+//EXTERN RetrieveOriginalSSN : PROC
+void IndirectSyscall() {
+
+
+}
+
+WORD RetrieveOriginalSSN() {
+
+}
+
 int main() {
 
 
@@ -596,6 +609,8 @@ int main() {
     GetVXTableEntry(pNtdllBase, ppImageExportDirectory, &VxTable.Write);
     
     printf("Systemcall: Write\t ADDR: 0x%p \t Hash: %0.8X \t SSN: %hu\n", VxTable.Write.pAddress, VxTable.Write.dwHash, VxTable.Write.wSystemCall);
+    //Now we just have to call the function using assembly temmplates!
+    
     getchar();
     return 0;
 }

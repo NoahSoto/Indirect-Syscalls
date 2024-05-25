@@ -34,5 +34,8 @@
     <MASM Include="Syswhispers3-asmx64.asm">
       <Filter>Source Files</Filter>
     </MASM>
+    <MASM Include="noah.asm">
+      <Filter>Source Files</Filter>
+    </MASM>
   </ItemGroup>
 </Project>
