@@ -534,7 +534,7 @@ BOOL GetVXTableEntry(DWORD dwDLLSize,PVOID* pSystemCalls ,PVOID pModuleBase, PIM
             ) {
             PBYTE opcode1 = *((PBYTE)pModuleBase + byteCounter);
             PBYTE opcode2 = *((PBYTE)pModuleBase + byteCounter + 1);
-            pSystemCalls[counter] = *((PBYTE)pModuleBase + byteCounter);
+            pSystemCalls[counter] = (PVOID)((PBYTE)pModuleBase + byteCounter);
             printf("0x%p\t%02x\t%02x\n", pSystemCalls[counter],opcode1, opcode2); // NICE
             
             counter++;
