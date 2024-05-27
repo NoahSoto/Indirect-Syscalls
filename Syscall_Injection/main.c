@@ -395,7 +395,7 @@ void GetBase(IN PPEB pPEB, OUT PVOID* pBaseAddr) {
 }
 
 
-void GetImageExportDir(PVOID pModuleBase, PIMAGE_EXPORT_DIRECTORY* ppImageExportDirectory) {
+void GetImageExportDir(PVOID pModuleBase, PIMAGE_EXPORT_DIRECTORY* ppImageExportDirectory, DWORD* dwDllSize) {
 
     PIMAGE_DOS_HEADER pImageDOSHeader = (PIMAGE_DOS_HEADER)pModuleBase; //Get a PIMAGE_DOS_HEADER struct from the modyle base 
                                                                         //so we get access to NT headers
@@ -407,8 +407,8 @@ void GetImageExportDir(PVOID pModuleBase, PIMAGE_EXPORT_DIRECTORY* ppImageExport
     //Now from the NT header we can extract the export address table for all fucntions within the dll
 
     *ppImageExportDirectory = (PIMAGE_EXPORT_DIRECTORY)((PBYTE)pModuleBase + pImageNtHeaders->OptionalHeader.DataDirectory[0].VirtualAddress);
-
-
+    *dwDllSize = pImageNtHeaders->OptionalHeader.SizeOfHeaders + pImageNtHeaders->OptionalHeader.SizeOfImage;
+    
 }
 
 // generate Djb2 hashes from wide-character input string
@@ -428,7 +428,16 @@ DWORD HashStringDjb2A(_In_ PCHAR String)
 }
 
 //Now this to me feels like a custom GetProcAddress essentially lol
-BOOL GetVXTableEntry(PVOID pModuleBase, PIMAGE_EXPORT_DIRECTORY pImageExportDirectory, OUT PVX_TABLE_ENTRY syscallTableEntry) {
+WORD wGloablSSN = 0;
+typedef struct{
+    PCHAR pcFuncName;
+    PVOID pSyscallLocation;
+} SystemcallPhonebook;
+
+
+SystemcallPhonebook scpSyscallPhonebook = { 0 };
+
+BOOL GetVXTableEntry(DWORD dwDLLSize,PVOID* pSystemCalls ,PVOID pModuleBase, PIMAGE_EXPORT_DIRECTORY pImageExportDirectory, OUT PVX_TABLE_ENTRY syscallTableEntry) {
 
     //Using our image export directory from the GetImageExportDir function we can use to find # of functions, function names, and the locations 
     //of those functions within their respect RVA arrays
@@ -497,6 +506,7 @@ BOOL GetVXTableEntry(PVOID pModuleBase, PIMAGE_EXPORT_DIRECTORY pImageExportDire
                         BYTE low = *((PBYTE)pFunctionAddress + 4 + byteCounter); // Offset 4
                     
                         syscallTableEntry->wSystemCall = (DWORD)((high << 8) | low);
+                        wGloablSSN = syscallTableEntry->wSystemCall;
                         printf("Bruh %d\n", syscallTableEntry->wSystemCall);
                        
                         // syscallTableEntry->pAddress = (PBYTE)0xDEADBEEF; // I got issues landing on ret a lot and this fixed it?
@@ -510,6 +520,29 @@ BOOL GetVXTableEntry(PVOID pModuleBase, PIMAGE_EXPORT_DIRECTORY pImageExportDire
         }
 
     }
+    //Now begin loop to populate list of syscall locaitons
+
+    WORD byteCounter = 0;
+    WORD counter = 0;
+    while (TRUE) {
+        if (byteCounter == dwDLLSize) {
+            break;
+            printf("End of DLL\n");
+        }
+        if (
+            *((PBYTE)pModuleBase + byteCounter) == 0x0f && *((PBYTE)pModuleBase + byteCounter + 1) == 0x05
+            ) {
+            PBYTE opcode1 = *((PBYTE)pModuleBase + byteCounter);
+            PBYTE opcode2 = *((PBYTE)pModuleBase + byteCounter + 1);
+            pSystemCalls[counter] = *((PBYTE)pModuleBase + byteCounter);
+            printf("0x%p\t%02x\t%02x\n", pSystemCalls[counter],opcode1, opcode2); // NICE
+            
+            counter++;
+        }
+        byteCounter = byteCounter + 1;
+
+        }
+    
         //Now since we don't want to pass strings of APIs we will hash and compare hashes to pre-hashed list.
         //See the API_Hashing module example
     return TRUE;
@@ -518,15 +551,10 @@ BOOL GetVXTableEntry(PVOID pModuleBase, PIMAGE_EXPORT_DIRECTORY pImageExportDire
 
 
 //EXTERN IndirectSyscall : PROC
-//EXTERN RetrieveOriginalSSN : PROC
-void IndirectSyscall() {
+//find the location of a random ahh syscall to jump to.
 
 
-}
 
-WORD RetrieveOriginalSSN() {
-
-}
 
 int main() {
 
@@ -577,7 +605,14 @@ int main() {
 
     //Now with the base address of NTDLL we need to get all of the functions within it, the Image Export Directory
     PIMAGE_EXPORT_DIRECTORY ppImageExportDirectory = NULL;
-    GetImageExportDir(pNtdllBase,&ppImageExportDirectory);
+    DWORD dwDLLSize = 0; // expirementally about how many functions to expect :shrug:
+    GetImageExportDir(pNtdllBase,&ppImageExportDirectory,&dwDLLSize);
+
+
+
+    printf("DLL Size (bytes): %d", dwDLLSize);
+
+    PVOID* pSystemCalls = (PVOID*)malloc(dwDLLSize * sizeof(PVOID)); //allocate PVOID * dwDLLSize memory for our array of pointers
 
 
     VX_TABLE VxTable = { 0 };
@@ -606,11 +641,12 @@ int main() {
     //Now with the image export directory we can loop through function names and find the desired functions for syscalls!
     printf("Systemcall: Write\t ADDR: 0x%p \t Hash: %0.8X \t SSN: %d\n", VxTable.Write.pAddress, VxTable.Write.dwHash, VxTable.Write.wSystemCall);
 
-    GetVXTableEntry(pNtdllBase, ppImageExportDirectory, &VxTable.Write);
+    GetVXTableEntry(dwDLLSize,&pSystemCalls,pNtdllBase, ppImageExportDirectory, &VxTable.Write);
     
     printf("Systemcall: Write\t ADDR: 0x%p \t Hash: %0.8X \t SSN: %hu\n", VxTable.Write.pAddress, VxTable.Write.dwHash, VxTable.Write.wSystemCall);
     //Now we just have to call the function using assembly temmplates!
     
+
     getchar();
     return 0;
 }
