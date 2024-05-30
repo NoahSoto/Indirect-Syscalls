@@ -1,5 +1,18 @@
 .code
 
+EXTERN GetSSN: PROC
+EXTERN GetJMP: PROC
+
+NoahRead PROC
+	mov rcx, 0000000000 ; 000000000 is just gonna be Read i guess
+	call GetSSN ; Will return the ACTUAL SSN into rcx, and the jump address location into RDX.
+	mov r10,	 ;Follow standard syscall procdure, move SSN into r10 , now since r10 has SSN we dont need RCX anymore
+	call GetJMP ; Will return indirect jmp location into rcx.
+	jmp rax ; THis is the actual jump to a syscall within another syscall, then we can use their ret as well.
+	;Then im hoping that the rcx->r11 registers remain un tampered with and the systemcall just works basically.
+NoahRead ENDP
+end
+
 
 ;I dont fully understand this syntax but im gonna go w it for now;
 
@@ -44,8 +57,5 @@
 ;RCX=1
 ;RDX=2
 ;ActualSSN,Indirect JMP Location
-	NoahAssembly PROC
-		mov r10, rcx ;Follow standard syscall procdure, move SSN into r10
-		jmp rdx ; THis is the actual jump to a syscall within another syscall, then we can use their ret as well.
-	NoahAssembly ENDP
-end
+
+

