@@ -2,11 +2,16 @@
 
 EXTERN GetSSN: PROC
 EXTERN GetJMP: PROC
+EXTERN printf: proc              ; Declare printf from the C runtime library
+	
 
 NoahRead PROC
-	mov rcx, 0000000000 ; 000000000 is just gonna be Read i guess
-	call GetSSN ; Will return the ACTUAL SSN into rcx, and the jump address location into RDX.
-	mov r10,	 ;Follow standard syscall procdure, move SSN into r10 , now since r10 has SSN we dont need RCX anymore
+
+	mov rcx, 0 ; 0 is just gonna be Read i guess
+	call GetSSN ; Will return the ACTUAL SSN into RAX,
+
+	mov r10,rax	 ;Follow standard syscall procdure, move SSN into r10 , now since r10 has SSN we dont need RAX anymore
+
 	call GetJMP ; Will return indirect jmp location into rcx.
 	jmp rax ; THis is the actual jump to a syscall within another syscall, then we can use their ret as well.
 	;Then im hoping that the rcx->r11 registers remain un tampered with and the systemcall just works basically.

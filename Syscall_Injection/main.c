@@ -581,10 +581,12 @@ BOOL GetVXTableEntry(DWORD dwDLLSize,PVOID* pSystemCalls ,PVOID pModuleBase, PIM
 
 
 
-WORD GetSSN(DWORD input) {
+EXTERN_C DWORD GetSSN(DWORD input) {
+    printf("%d\n", input);
     if (input == 0) {
-        printf("Wow! Read Syscall Getter called: %zu\n",VxTable.Read.wSystemCall);
-        return VxTable.Read.wSystemCall;
+        printf("Wow! Read Syscall Getter called: %d\n",VxTable.Read.wSystemCall);
+        
+        return (DWORD)VxTable.Read.wSystemCall;
     }
     else if (input == 1) {
         return VxTable.Write.wSystemCall;
@@ -594,13 +596,17 @@ WORD GetSSN(DWORD input) {
     }
 }
 
-PVOID GetJMP() {
-    PVOID address = pSystemCalls[((DWORD)rand()) % sizeof(pSystemCalls)];
+EXTERN_C PVOID GetJMP() {
+    getchar();
+    printf("Now would be a good time to check rax for the syscall value...\n");
+
+    //PVOID address = pSystemCalls[((DWORD)rand()) % sizeof(pSystemCalls)];
+    PVOID address = (PVOID)(0xdeadbeef);
     printf("Getting JMP! 0x%p\n", address);
     getchar();
-    return address;
+    return &address;
 }
-
+    
 
 
 int main() {
