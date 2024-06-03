@@ -1,20 +1,40 @@
-.code
 
+
+
+
+.code
+public NoahRead
 EXTERN GetSSN: PROC
 EXTERN GetJMP: PROC
-EXTERN printf: proc              ; Declare printf from the C runtime library
-	
+EXTERN gSSN:QWORD 
+EXTERN gJMP:QWORD
+
+EXTERN SW3_GetSyscallNumber: PROC
+
+EXTERN SW3_GetRandomSyscallAddress: PROC
+
 
 NoahRead PROC
+	mov [rsp+8],rcx
+	mov [rsp+16],rax
+	mov [rsp+24],rsp
 
-	mov rcx, 0 ; 0 is just gonna be Read i guess
-	call GetSSN ; Will return the ACTUAL SSN into RAX,
 
-	mov r10,rax	 ;Follow standard syscall procdure, move SSN into r10 , now since r10 has SSN we dont need RAX anymore
+	
 
-	call GetJMP ; Will return indirect jmp location into rcx.
-	jmp rax ; THis is the actual jump to a syscall within another syscall, then we can use their ret as well.
-	;Then im hoping that the rcx->r11 registers remain un tampered with and the systemcall just works basically.
+	call GetJMP ; this is fucked.
+	mov r11,rax
+
+	mov rcx,0
+	call GetSSN
+	mov r10,rax
+
+	mov rcx, [rsp+8] ; Restore RCX.
+	mov rax, [rsp+16]
+	mov rsp, [rsp+24]
+
+	jmp r11
+	
 NoahRead ENDP
 end
 

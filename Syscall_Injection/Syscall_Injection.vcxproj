@@ -132,6 +132,7 @@
     <ClCompile Include="Syswhispers.c" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="assembly.h" />
     <ClInclude Include="Syswhispers.h" />
     <ClInclude Include="typedef.h" />
   </ItemGroup>
