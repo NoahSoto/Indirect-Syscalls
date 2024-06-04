@@ -6,6 +6,7 @@
 public NoahRead
 EXTERN GetSSN: PROC
 EXTERN GetJMP: PROC
+EXTERN UpdateGlobals: PROC
 EXTERN gSSN:QWORD 
 EXTERN gJMP:QWORD
 
@@ -19,26 +20,39 @@ NoahRead PROC
 	mov [rsp+16],rax
 	mov [rsp+24],rsp
 
+	;takes in the SSN as a parameter
+	;takes in the memory address as a parameter 
+	call GetSSN;
+	mov r14,rax;
+	mov rax,0h;
 
 	
+	call GetJMP; this is f****. BUT WE DO JUMP TO R11!!
+	mov r13,rax
 
-	call GetJMP ; this is fucked.
-	mov r11,rax
-
-	mov rcx,0
-	call GetSSN
-	mov r10,rax
 
 	mov rcx, [rsp+8] ; Restore RCX.
 	mov rax, [rsp+16]
 	mov rsp, [rsp+24]
 
-	jmp r11
+	mov r10,r14
+	jmp r13
 	
 NoahRead ENDP
+
+
+NoahRead2 PROC
+
+	;if we can get global variables to work then the input parameters of the sysccall can remain in the same order.
+	mov rcx,0
+	call UpdateGlobals
+	mov r14,gSSN ;using registers for better vis in debugger
+	mov r15,gJMP
+
+	jmp qword ptr [r15]
+	ret
+NoahRead2 ENDP
 end
-
-
 ;I dont fully understand this syntax but im gonna go w it for now;
 
 ;Okay so what I'm thinking is we remake that GetRandomSyscallAddress by Hells Gating through NTDLL and saving all
