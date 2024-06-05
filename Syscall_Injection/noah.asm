@@ -43,13 +43,31 @@ NoahRead ENDP
 
 NoahRead2 PROC
 
+	pop r13
+
 	;if we can get global variables to work then the input parameters of the sysccall can remain in the same order.
+	;mov [rsp+8],rcx
 	mov rcx,0
+
 	call UpdateGlobals
 	mov r14,gSSN ;using registers for better vis in debugger
-	mov r15,gJMP
+	mov r15,gJMP; WORKS WORKS WORKS
 
-	jmp qword ptr [r15]
+	;jmp qword ptr [r15]
+
+	;mov rcx,[rsp+8]
+	;mov r10, rcx
+	;movzx eax, word ptr [r14]
+	
+
+	
+	mov r10,rcx
+	mov rax,r14
+	;jmp qword ptr [r15]
+	syscall
+	;
+	
+	push r13
 	ret
 NoahRead2 ENDP
 end
