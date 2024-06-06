@@ -42,8 +42,15 @@ NoahRead ENDP
 
 
 NoahRead2 PROC
-
+	mov [rsp +8], rcx          ; Save registers.
+	mov [rsp+16], rdx
+	mov [rsp+24], r8
+	mov [rsp+32], r9
+	sub rsp, 28h
 	pop r13
+
+
+
 
 	;if we can get global variables to work then the input parameters of the sysccall can remain in the same order.
 	;mov [rsp+8],rcx
@@ -61,13 +68,22 @@ NoahRead2 PROC
 	
 
 	
-	mov r10,rcx
-	mov rax,r14
+	;mov r10,rcx ; we did this step at the beigning prior to using rcx for funciton input
+	mov eax,r14d
+	
+	
 	;jmp qword ptr [r15]
 	syscall
-	;
 	
 	push r13
+
+	add rsp, 28h
+	mov rcx, [rsp+8]                      ; Restore registers.
+	mov rdx, [rsp+16]
+	mov r8, [rsp+24]
+	mov r9, [rsp+32]
+	mov r10,rcx
+
 	ret
 NoahRead2 ENDP
 end
