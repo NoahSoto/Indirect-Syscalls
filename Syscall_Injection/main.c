@@ -190,12 +190,12 @@ BOOL hollowProcess(PROCESS_INFORMATION Pi, SIZE_T sPayload) {
     
    
    // printf("RESULTSS????? %d, %d\n", result, bytesRW);
-    
-    BOOL result = NoahRead2(Pi.hProcess, (LPCVOID)BaseAddress, procAddr, 64, &bytesRW);
-    
+    getchar();
+    NTSTATUS result = NoahRead3(Pi.hProcess, (LPCVOID)BaseAddress, procAddr, 64, &bytesRW);
+    getchar();
     printf("Enging NoahRead\n");
     
-    //printf("RESULTSS????? %d, %d\n", result, bytesRW);
+    printf("ntstatus RESULTSS????? 0x%x, %d\n", result, bytesRW);
     printf("Proc Address (Empty 1): 0x%p\n", procAddr);
     printf("Proc Address (Empty 2): 0x%p\n", procAddr2);
     printf("&Proc Address (Working): 0x%p\n", *procAddr);
