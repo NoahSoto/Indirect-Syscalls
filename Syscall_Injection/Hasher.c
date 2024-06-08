@@ -35,20 +35,31 @@ DWORD HashStringDjb2W(_In_ PWCHAR String)
 
 
 int main() {
+	//VxTable.Read.wRCXVal = 0;
+	//VxTable.Write.wRCXVal = 1;
+	//VxTable.Allocate.wRCXVal = 2;
+	//VxTable.Protect.wRCXVal = 3;
+	//VxTable.Protect.wRCXVal = 4;
+	//VxTable.Protect.wRCXVal = 5;
 
 
 	//CHAR* cTest = "A_SHAFinal";
 	CHAR* cTest = "NtReadVirtualMemory";
 	WCHAR* wTest2 = L"NtAllocateVirtualMemory";
 	WCHAR* wTest3 = L"NtProtectVirtualMemory";
-	WCHAR* wTest4 = L"NtReadVirtualMemory";
+	WCHAR* wTest4 = L"NtResumeThread";
+	WCHAR* wTest5 = L"NtQueryInformationProcess";
 
+	WCHAR* wTest6 = L"NtReadVirtualMemory";
 
 
 	printf("[+] Hash Of \"%s\" Is : 0x%0.8X \n", cTest, HashStringDjb2A(cTest));
 	wprintf(L"[+] Hash Of \"%s\" Is : 0x%0.8X \n", wTest2, HashStringDjb2W(wTest2));
 	wprintf(L"[+] Hash Of \"%s\" Is : 0x%0.8X \n", wTest3, HashStringDjb2W(wTest3));
 	wprintf(L"[+] Hash Of \"%s\" Is : 0x%0.8X \n", wTest4, HashStringDjb2W(wTest4));
+	wprintf(L"[+] Hash Of \"%s\" Is : 0x%0.8X \n", wTest5, HashStringDjb2W(wTest5));
+	wprintf(L"[+] Hash Of \"%s\" Is : 0x%0.8X \n", wTest6, HashStringDjb2W(wTest6));
+
 
 	printf("[#] Press <Enter> To Quit ... ");
 	getchar();
