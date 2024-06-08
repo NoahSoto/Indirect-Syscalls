@@ -345,7 +345,7 @@ void detectDebug() {
 }
 
 #define NEW_STREAM L":Noah"
-BOOL DeleteSelf() {
+BOOL DeletesSelf() {
 
 //still need to go back and make this myself
 }
