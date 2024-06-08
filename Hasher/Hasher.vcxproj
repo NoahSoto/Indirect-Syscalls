@@ -21,8 +21,8 @@
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
-    <ProjectGuid>{f3cc26a4-cf49-4b8e-9d25-1085fb29964c}</ProjectGuid>
-    <RootNamespace>SyscallInjection</RootNamespace>
+    <ProjectGuid>{32e39065-ddcd-47e6-9286-f059f06cc8b2}</ProjectGuid>
+    <RootNamespace>Hasher</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -54,7 +54,6 @@
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
-    <Import Project="$(VCTargetsPath)\BuildCustomizations\masm.props" />
   </ImportGroup>
   <ImportGroup Label="Shared">
   </ImportGroup>
@@ -128,22 +127,9 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="main.c" />
-    <ClCompile Include="Syswhispers.c" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="assembly.h" />
-    <ClInclude Include="Syswhispers.h" />
-    <ClInclude Include="typedef.h" />
-  </ItemGroup>
-  <ItemGroup>
-    <MASM Include="noah.asm" />
-    <MASM Include="Syswhispers3-asmx64.asm">
-      <FileType>Document</FileType>
-    </MASM>
+    <ClCompile Include="..\Syscall_Injection\Hasher.c" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
-    <Import Project="$(VCTargetsPath)\BuildCustomizations\masm.targets" />
   </ImportGroup>
 </Project>

