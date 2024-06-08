@@ -7,6 +7,8 @@ public NoahRead
 EXTERN GetSSN: PROC
 EXTERN GetJMP: PROC
 EXTERN UpdateGlobals: PROC
+
+EXTERN gCurrentSyscall:QWORD
 EXTERN gSSN:QWORD 
 EXTERN gJMP:QWORD
 
@@ -93,7 +95,7 @@ NoahRead3 PROC
 	mov [rsp+24], r8
 	mov [rsp+32], r9
 	sub rsp, 28h
-	mov rcx,0
+	mov rcx,gCurrentSyscall
 	call UpdateGlobals        ; Get a syscall offset from a different api.
 	mov rax,gSSN ;Move SSN into EAX
 	mov r15,gJMP; WORKS WORKS WORKS

