@@ -1,5 +1,5 @@
 # Overview
-HUGE thank you to the Syswhipsers project and the MALDEV Academy team for getting my excited about these kinds of projects and in helping me work on this project!
+HUGE thank you to the Syswhipsers project and the MALDEV Academy team for getting me excited about these kinds of projects and in helping me work on this project!
 
 The `Syswhispers` branch is the syswhipers implementation
 
