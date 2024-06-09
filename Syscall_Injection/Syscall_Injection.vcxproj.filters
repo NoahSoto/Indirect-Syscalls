@@ -29,9 +29,6 @@
     <ClInclude Include="typedef.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="assembly.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <MASM Include="Syswhispers3-asmx64.asm">
