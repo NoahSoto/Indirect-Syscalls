@@ -3,91 +3,10 @@
 
 
 .code
-public NoahRead
-EXTERN GetSSN: PROC
-EXTERN GetJMP: PROC
 EXTERN UpdateGlobals: PROC
-
 EXTERN gCurrentSyscall:QWORD
 EXTERN gSSN:QWORD 
 EXTERN gJMP:QWORD
-
-EXTERN SW3_GetSyscallNumber: PROC
-
-EXTERN SW3_GetRandomSyscallAddress: PROC
-
-
-NoahRead PROC
-	mov [rsp+8],rcx
-	mov [rsp+16],rax
-	mov [rsp+24],rsp
-
-	;takes in the SSN as a parameter
-	;takes in the memory address as a parameter 
-	call GetSSN;
-	mov r14,rax;
-	mov rax,0h;
-
-	
-	call GetJMP; this is f****. BUT WE DO JUMP TO R11!!
-	mov r13,rax
-
-
-	mov rcx, [rsp+8] ; Restore RCX.
-	mov rax, [rsp+16]
-	mov rsp, [rsp+24]
-
-	mov r10,r14
-	jmp r13
-	
-NoahRead ENDP
-
-
-NoahRead2 PROC
-	mov [rsp +8], rcx          ; Save registers.
-	mov [rsp+16], rdx
-	mov [rsp+24], r8
-	mov [rsp+32], r9
-	sub rsp, 28h
-	pop r13
-
-
-
-
-	;if we can get global variables to work then the input parameters of the sysccall can remain in the same order.
-	;mov [rsp+8],rcx
-	mov rcx,0
-
-	call UpdateGlobals
-	mov r14,gSSN ;using registers for better vis in debugger
-	mov r15,gJMP; WORKS WORKS WORKS
-
-	;jmp qword ptr [r15]
-
-	;mov rcx,[rsp+8]
-	;mov r10, rcx
-	;movzx eax, word ptr [r14]
-	
-
-	
-	;mov r10,rcx ; we did this step at the beigning prior to using rcx for funciton input
-	mov eax,r14d
-	
-	
-	;jmp qword ptr [r15]
-	syscall
-	
-	push r13
-
-	add rsp, 28h
-	mov rcx, [rsp+8]                      ; Restore registers.
-	mov rdx, [rsp+16]
-	mov r8, [rsp+24]
-	mov r9, [rsp+32]
-	mov r10,rcx
-	ret
-NoahRead2 ENDP
-
 
 NoahRead3 PROC
 	mov [rsp +8], rcx          ; Save registers.
