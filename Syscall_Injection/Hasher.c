@@ -51,6 +51,17 @@ int main() {
 	WCHAR* wTest5 = L"NtQueryInformationProcess";
 
 	WCHAR* wTest6 = L"NtReadVirtualMemory";
+	printf("Hashes for DLL Unhooking\n");
+	WCHAR* wTest7 = L"NtCreateFile";
+	//WCHAR* wTest8 = L"NtMapViewOfSection";
+
+	WCHAR* wTest8 = L"NtWriteVirtualMemory";
+	WCHAR* wTest9 = L"NtCreateUserProcess";
+
+	WCHAR* wTest10 = L"RtlCreateProcessParametersEx";
+	WCHAR* wTest11 = L"RtlInitUnicodeString";
+	WCHAR* wTest12 = L"NtOpenProcess";
+
 
 
 	printf("[+] Hash Of \"%s\" Is : 0x%0.8X \n", cTest, HashStringDjb2A(cTest));
@@ -59,7 +70,13 @@ int main() {
 	wprintf(L"[+] Hash Of \"%s\" Is : 0x%0.8X \n", wTest4, HashStringDjb2W(wTest4));
 	wprintf(L"[+] Hash Of \"%s\" Is : 0x%0.8X \n", wTest5, HashStringDjb2W(wTest5));
 	wprintf(L"[+] Hash Of \"%s\" Is : 0x%0.8X \n", wTest6, HashStringDjb2W(wTest6));
+	wprintf(L"[+] Hash Of \"%s\" Is : 0x%0.8X \n", wTest7, HashStringDjb2W(wTest7));
+	wprintf(L"[+] Hash Of \"%s\" Is : 0x%0.8X \n", wTest8, HashStringDjb2W(wTest8));
 
+	wprintf(L"[+] Hash Of \"%s\" Is : 0x%0.8X \n", wTest9, HashStringDjb2W(wTest9));
+	wprintf(L"[+] Hash Of \"%s\" Is : 0x%0.8X \n", wTest10, HashStringDjb2W(wTest10));
+	wprintf(L"[+] Hash Of \"%s\" Is : 0x%0.8X \n", wTest11, HashStringDjb2W(wTest11));
+	wprintf(L"[+] Hash Of \"%s\" Is : 0x%0.8X \n", wTest12, HashStringDjb2W(wTest12));
 
 	printf("[#] Press <Enter> To Quit ... ");
 	getchar();

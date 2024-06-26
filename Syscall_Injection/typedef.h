@@ -8,14 +8,37 @@ typedef struct _UNICODE_STRING {
     PWSTR  Buffer;       // Pointer to the buffer containing the Unicode characters
 } UNICODE_STRING, * PUNICODE_STRING;
 
+typedef struct _RTL_USER_PROCESS_PARAMETERS* PRTL_USER_PROCESS_PARAMETERS;
+
 typedef struct _RTL_USER_PROCESS_PARAMETERS {
-    BYTE           Reserved1[16];
-    PVOID          Reserved2[10];
+    ULONG Length;
+    HANDLE ProcessHandle;
+    HANDLE ThreadHandle;
+   // CLIENT_ID ClientId;
     UNICODE_STRING ImagePathName;
     UNICODE_STRING CommandLine;
+    PVOID Environment;
+    ULONG Flags;
+    ULONG ShowWindowFlags;
+    UNICODE_STRING CurrentDirectoryPath;
+    HANDLE CurrentDirectoryHandle;
+    UNICODE_STRING DllPath;
+    UNICODE_STRING WindowTitle;
+    UNICODE_STRING DesktopInfo;
+    UNICODE_STRING ShellInfo;
+    UNICODE_STRING RuntimeData;
+    //RTL_DRIVE_LETTER_CURDIR CurrentDirectores[32];
+    ULONG_PTR EnvironmentSize;
+    ULONG_PTR EnvironmentVersion;
+    PVOID PackageDependencyData;
+    ULONG ProcessGroupId;
+    ULONG LoaderThreads;
 } RTL_USER_PROCESS_PARAMETERS, * PRTL_USER_PROCESS_PARAMETERS;
 
+
+
 typedef void* PPS_POST_PROCESS_INIT_ROUTINE;
+
 typedef struct {
     ULONG PriorityClass;
     ULONG PrioritySubClass;
@@ -217,3 +240,251 @@ typedef struct _TEB {
     PPEB ProcessEnvironmentBlock; // Pointer to the PEB
     // ... additional fields omitted for brevity
 } TEB, * PTEB;
+
+
+//
+
+
+// Define OBJECT_ATTRIBUTES structure
+typedef struct _OBJECT_ATTRIBUTES {
+    ULONG Length;
+    HANDLE RootDirectory;
+    PUNICODE_STRING ObjectName;
+    ULONG Attributes;
+    PVOID SecurityDescriptor; // PSECURITY_DESCRIPTOR;
+    PVOID SecurityQualityOfService; // PSECURITY_QUALITY_OF_SERVICE
+} OBJECT_ATTRIBUTES, * POBJECT_ATTRIBUTES;
+
+
+// Function prototype for NtCreateUserProcess
+typedef NTSTATUS(NTAPI* fnNtCreateUserProcess)(
+    PHANDLE ProcessHandle,
+    PHANDLE ThreadHandle,
+    ACCESS_MASK ProcessDesiredAccess,
+    ACCESS_MASK ThreadDesiredAccess,
+    POBJECT_ATTRIBUTES ProcessObjectAttributes,
+    POBJECT_ATTRIBUTES ThreadObjectAttributes,
+    ULONG ProcessFlags,
+    ULONG ThreadFlags,
+    PVOID ProcessParameters,
+    PVOID CreateInfo,
+    PVOID AttributeList
+    );
+
+
+// Function prototype for RtlInitUnicodeString
+typedef VOID(NTAPI* fnRtlInitUnicodeString)(
+    PUNICODE_STRING DestinationString,
+    PCWSTR SourceString
+    );
+
+// Function prototype for RtlCreateProcessParametersEx
+typedef NTSTATUS(NTAPI* fnCreateProcessPamameters)(
+    PRTL_USER_PROCESS_PARAMETERS* pProcessParameters,
+    PUNICODE_STRING ImagePathName,
+    PUNICODE_STRING DllPath,
+    PUNICODE_STRING CurrentDirectory,
+    PUNICODE_STRING CommandLine,
+    PVOID Environment,
+    PUNICODE_STRING WindowTitle,
+    PUNICODE_STRING DesktopInfo,
+    PUNICODE_STRING ShellInfo,
+    PUNICODE_STRING RuntimeData,
+    ULONG Flags // Pass RTL_USER_PROC_PARAMS_NORMALIZE
+    );
+
+typedef struct _RTL_DRIVE_LETTER_CURDIR {
+    USHORT Flags;                // Flags associated with this current directory
+    USHORT Length;               // Length of the string
+    ULONG TimeStamp;             // Timestamp for directory changes
+    UNICODE_STRING DosPath;      // The DOS path of the current directory
+} RTL_DRIVE_LETTER_CURDIR, * PRTL_DRIVE_LETTER_CURDIR;
+
+typedef struct _CURDIR {
+    UNICODE_STRING DosPath;      // The DOS path of the current directory
+    HANDLE Handle;               // Handle to the directory (if any)
+} CURDIR, * PCURDIR;
+
+#define RTL_MAX_DRIVE_LETTERS 32
+
+typedef struct _PS_ATTRIBUTE
+{
+    ULONG_PTR Attribute;
+    SIZE_T Size;
+    union
+    {
+        ULONG_PTR Value;
+        PVOID ValuePtr;
+    };
+    PSIZE_T ReturnLength;
+
+} PS_ATTRIBUTE, * PPS_ATTRIBUTE;
+
+typedef struct _PS_ATTRIBUTE_LIST
+{
+    SIZE_T TotalLength;
+    PS_ATTRIBUTE Attributes[1];
+
+} PS_ATTRIBUTE_LIST, * PPS_ATTRIBUTE_LIST;
+
+#define RTL_USER_PROC_PARAMS_NORMALIZE 0x00000001      // indicates that the parameters passed to the process are already in a normalized form
+
+#define PS_ATTRIBUTE_NUMBER_MASK    0x0000ffff
+
+#define PS_ATTRIBUTE_THREAD         0x00010000 // Attribute may be used with thread creation
+
+#define PS_ATTRIBUTE_INPUT          0x00020000 // Attribute is input only
+
+#define PS_ATTRIBUTE_ADDITIVE       0x00040000 // Attribute may be "accumulated", e.g. bitmasks, counters, etc.
+
+
+
+//\
+
+// Specifies the image namef the new process
+typedef enum _PS_ATTRIBUTE_NU
+{
+    PsAttributeParentProcess,                   // in HANDLE
+    PsAttributeDebugPort,                       // in HANDLE
+    PsAttributeToken,                           // in HANDLE
+    PsAttributeClientId,                        // out PCLIENT_ID
+    PsAttributeTebAddress,                      // out PTEB
+    PsAttributeImageName,                       // in PWSTR
+    PsAttributeImageInfo,                       // out PSECTION_IMAGE_INFORMATION
+    PsAttributeMemoryReserve,                   // in PPS_MEMORY_RESERVE
+    PsAttributePriorityClass,                   // in UCHAR
+    PsAttributeErrorMode,                       // in ULONG
+    PsAttributeStdHandleInfo,                   // in PPS_STD_HANDLE_INFO
+    PsAttributeHandleList,                      // in PHANDLE
+    PsAttributeGroupAffinity,                   // in PGROUP_AFFINITY
+    PsAttributePreferredNode,                   // in PUSHORT
+    PsAttributeIdealProcessor,                  // in PPROCESSOR_NUMBER
+    PsAttributeUmsThread,                       // see MSDN UpdateProceThreadAttributeList (CreateProcessW) - in PUMS_CREATE_THREAD_ATTRIBUTES
+    PsAttributeMitigationOptions,               // in UCHAR
+    PsAttributeProtectionLevel,                 // in 
+    PsAttributeSecureProcess,                   // since THRESHOLD (Virtual Secure Mode, Device Guard
+    PsAttributeJobList,
+    PsAttributeChildProcessPolicy,              // since 
+    PsAttributeAllApplicationPackagesPolicy,    // since 
+    PsAttributeWin32kFilter,
+    PsAttributeSafeOpenPromptOriginClaim,
+    PsAttributeBnoIsolation,
+    PsAttributeDesktopAppPolicy,
+    PsAttributeMax,
+} PS_ATTRIBUTE_NUM;
+
+
+
+#define PsAttributeValue(Number, Thread, Input, Additive) (((Number)&PS_ATTRIBUTE_NUMBER_MASK) | ((Thread) ? PS_ATTRIBUTE_THREAD : 0) | ((Input) ? PS_ATTRIBUTE_INPUT : 0) | ((Additive) ? PS_ATTRIBUTE_ADDITIVE : 0))
+
+
+#define PS_ATTRIBUTE_IMAGE_NAME PsAttributeValue(PsAttributeImageName, FALSE, TRUE, FALSE)
+
+#define PS_ATTRIBUTE_PARENT_PROCESS 0x20003
+#define PS_ATTRIBUTE_MITIGATION_OPTIONS_2 0x20004
+
+typedef enum _PS_CREATE_STATE {
+    PsCreateInitialState,
+    PsCreateFailOnFileOpen,
+    PsCreateFailOnSectionCreate,
+    PsCreateFailExeFormat,
+    PsCreateFailMachineMismatch,
+    PsCreateFailExeName,
+    PsCreateSuccess,
+    PsCreateMaximumStates
+} PS_CREATE_STATE;
+
+
+typedef struct _PS_CREATE_INFO
+{
+    SIZE_T Size;
+    PS_CREATE_STATE State;
+    union
+    {
+        struct
+        {
+            union
+            {
+                ULONG InitFlags;
+                struct
+                {
+                    UCHAR WriteOutputOnExit : 1;
+                    UCHAR DetectManifest : 1;
+                    UCHAR IFEOSkipDebugger : 1;
+                    UCHAR IFEODoNotPropagateKeyState : 1;
+                    UCHAR SpareBits1 : 4;
+                    UCHAR SpareBits2 : 8;
+                    USHORT ProhibitedImageCharacteristics : 16;
+                } s1;
+            } u1;
+            ACCESS_MASK AdditionalFileAccess;
+        } InitState;
+
+        struct
+        {
+            HANDLE FileHandle;
+        } FailSection;
+
+        struct
+        {
+            USHORT DllCharacteristics;
+        } ExeFormat;
+
+        struct
+        {
+            HANDLE IFEOKey;
+        } ExeName;
+
+        struct
+        {
+            union
+            {
+                ULONG OutputFlags;
+                struct
+                {
+                    UCHAR ProtectedProcess : 1;
+                    UCHAR AddressSpaceOverride : 1;
+                    UCHAR DevOverrideEnabled : 1;
+                    UCHAR ManifestDetected : 1;
+                    UCHAR ProtectedProcessLight : 1;
+                    UCHAR SpareBits1 : 3;
+                    UCHAR SpareBits2 : 8;
+                    USHORT SpareBits3 : 16;
+                } s2;
+            } u2;
+            HANDLE FileHandle;
+            HANDLE SectionHandle;
+            ULONGLONG UserProcessParametersNative;
+            ULONG UserProcessParametersWow64;
+            ULONG CurrentParameterFlags;
+            ULONGLONG PebAddressNative;
+            ULONG PebAddressWow64;
+            ULONGLONG ManifestAddress;
+            ULONG ManifestSize;
+        } SuccessState;
+    };
+
+} PS_CREATE_INFO, * PPS_CREATE_INFO;
+
+#define InitializeObjectAttributes( p, n, a, r, s ) { \
+    (p)->Length = sizeof(OBJECT_ATTRIBUTES); \
+    (p)->RootDirectory = r; \
+    (p)->Attributes = a; \
+    (p)->ObjectName = n; \
+    (p)->SecurityDescriptor = s; \
+    (p)->SecurityQualityOfService = NULL; \
+}
+// Define the NtOpenProcess function prototype
+typedef NTSTATUS(NTAPI* fnNtOpenProcess)(
+    PHANDLE ProcessHandle,
+    ACCESS_MASK DesiredAccess,
+    POBJECT_ATTRIBUTES ObjectAttributes,
+    PCLIENT_ID ClientId
+    );
+
+//process hacker!
+//\
+https://github.com/processhacker/processhacker/blob/master/phnt/include/ntpsapi.h#L1219
+#define PROCESS_CREATE_FLAGS_SUSPENDED 0x00000200 // NtCreateProcessEx & NtCreateUserProcess
+#define THREAD_CREATE_FLAGS_CREATE_SUSPENDED 0x00000001
+#define PROCESS_CREATE_FLAGS_SUSPENDED 0x00000200 // NtCreateProcessEx & NtCreateUserProcess
