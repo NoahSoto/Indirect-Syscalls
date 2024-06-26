@@ -622,8 +622,10 @@ EXTERN_C void UpdateGlobals(DWORD input) {
 
 }
 
-//\
-https://offensivedefence.co.uk/posts/ntcreateuserprocess/ <- super helpful resource!
+//\ Block DLL Policy on the new process we create in suspended for process hollowing.
+//https://offensivedefence.co.uk/posts/ntcreateuserprocess/ <- super helpful resource!
+
+
 void customCreateProcess(IN PWSTR procName, IN PWSTR dir, IN PWSTR commandLine, OUT HANDLE* hProceessOut, OUT HANDLE* hThreadOut) {
     NTSTATUS result;
 
