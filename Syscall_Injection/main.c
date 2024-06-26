@@ -547,7 +547,7 @@ BOOL GetVXTableEntry(DWORD dwDLLSize,PVOID* pSystemCalls ,PVOID pModuleBase, PIM
 
 EXTERN_C void UpdateGlobals(DWORD input) {
     printf("Indexes of systemcalls %d\n", sizeof(pSystemCalls) / sizeof(pSystemCalls[0]));
-   uint64_t address = pSystemCalls[rand() % (sizeof(pSystemCalls) / sizeof(pSystemCalls[0]))];    //PVOID address = (PVOID)(0xdeadbeef);
+    uint64_t address = pSystemCalls[rand() % (sizeof(pSystemCalls) / sizeof(pSystemCalls[0]))];    //PVOID address = (PVOID)(0xdeadbeef);
     //PVOID address = (PVOID)(0xdeadbeef);
     //uint64_t* address = (uint64_t*)0x00007FF97312D232;
 
@@ -617,6 +617,13 @@ EXTERN_C void UpdateGlobals(DWORD input) {
         gSSN = VxTable.InitUnicodeString.wSystemCall;
         getchar();
         return VxTable.InitUnicodeString.wSystemCall;
+    }
+    else if (input == 9) {
+        printf("Wow! QueryInfo Syscall Getter called: %d\n", VxTable.OpenProcess.wSystemCall);
+        printf("gSSN: 0x%p", &gSSN);
+        gSSN = VxTable.OpenProcess.wSystemCall;
+        getchar();
+        return VxTable.OpenProcess.wSystemCall;
     }
     printf("Syscall input not found, check your input in C or RCX\n");
 
