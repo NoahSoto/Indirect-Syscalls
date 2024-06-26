@@ -22,6 +22,6 @@ Payload into HellShell Rc4 decryptor using `SystemFunction032`
 
 I'd like to do some more indepth analysis at a later point but I also included API calls of the Syswhispers implementation comparing direct & indirect systemcalls.
 
-# Overview
+# Explanation
 
 Coming soon.
